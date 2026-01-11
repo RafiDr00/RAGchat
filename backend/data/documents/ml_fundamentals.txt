@@ -1,0 +1,7 @@
+Machine Learning is a subset of artificial intelligence that focuses on algorithms.
+It involves training models on data to make predictions or decisions.
+Common ML techniques include supervised learning, unsupervised learning, and reinforcement learning.
+Popular frameworks include TensorFlow, PyTorch, and Scikit-learn.
+ML is used in recommendation systems, image recognition, and natural language processing.
+Deep learning uses neural networks with multiple layers.
+Feature engineering is crucial for traditional ML approaches.

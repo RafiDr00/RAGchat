@@ -1,0 +1,7 @@
+Retrieval-Augmented Generation (RAG) combines document retrieval with language models.
+RAG systems first search for relevant documents, then use them to generate answers.
+This approach reduces hallucination and provides grounded responses.
+RAG is particularly useful for question-answering systems and chatbots.
+The process involves embedding documents, storing them in a vector database, and retrieving similar content.
+Vector similarity is typically measured using cosine similarity.
+RAG can be enhanced with hybrid search combining keyword and semantic search.
