@@ -394,7 +394,7 @@ export default function Home() {
 
       {/* MAIN CONTENT */}
       <main className="relative pt-24 pb-12 px-6">
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-8">
           {/* UPLOAD SECTION - Only visible when no docs indexed */}
           {documentCount === 0 && (
             <motion.div
