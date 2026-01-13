@@ -1,6 +1,6 @@
 """
-Document Processor - Fortune 500 Grade Multi-Format Ingestion
-Supports: PDF, TXT, Images (PNG, JPG, JPEG, TIFF, BMP)
+Document Processor - Multi-Format Document Ingestion
+Supports: PDF, Text (TXT, MD, CSV, JSON, XML, HTML), Images (PNG, JPG, JPEG, TIFF, BMP, GIF, WEBP)
 """
 import os
 import logging

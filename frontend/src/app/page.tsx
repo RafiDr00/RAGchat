@@ -605,7 +605,7 @@ const GlassDock: React.FC<GlassDockProps> = ({
                   {documentCount > 0 ? `${documentCount} chunks indexed` : 'No documents'}
                 </div>
                 <div className="text-[10px] text-white/50 font-mono tracking-wide">
-                  PDF • TXT • Images (OCR)
+                  PDF • TXT • MD • CSV • JSON • XML • HTML • Images
                 </div>
               </motion.div>
             )}
@@ -654,7 +654,7 @@ const GlassDock: React.FC<GlassDockProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".txt,.pdf,.png,.jpg,.jpeg,.tiff,.bmp,.gif,.webp,.md,.csv,.json"
+          accept=".txt,.pdf,.png,.jpg,.jpeg,.tiff,.bmp,.gif,.webp,.md,.csv,.json,.xml,.html"
           onChange={handleFileSelect}
           className="hidden"
         />

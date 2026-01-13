@@ -17,8 +17,8 @@ DATA_DIR.mkdir(exist_ok=True, parents=True)
 UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 
 app = FastAPI(
-    title="Fortune 500 RAG System",
-    description="Enterprise-grade RAG with multi-format document support",
+    title="RAGchat",
+    description="Ultra-minimal, high-fidelity RAG system with multi-format document support",
     version="2.0.0"
 )
 
