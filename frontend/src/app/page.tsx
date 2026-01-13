@@ -6,7 +6,7 @@ import { Upload, Loader2, FileText, Image as ImageIcon, File, X, ChevronRight } 
 import axios from 'axios'
 
 /* ============================================================================
-   SPRING CONFIGURATION - Zenith Stealth Luxury Feel
+   SPRING CONFIGURATION - Luxury Feel
    Stiffness: 260, Damping: 20 - Snappy yet elegant
    ============================================================================ */
 
@@ -754,7 +754,7 @@ const BlinkingCursor: React.FC = () => (
 )
 
 /* ============================================================================
-   MAIN INTERFACE - Zenith Stealth Canvas
+   MAIN INTERFACE - RAGchat Canvas
    ============================================================================ */
 
 interface QueryResult {

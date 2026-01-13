@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 /* ============================================================================
-   ZENITH STEALTH - Fortune 500 Design System
+   RAGchat Design System
    Ultra-minimal, high-fidelity experience using light as primary material
    ============================================================================ */
 
@@ -13,24 +13,24 @@
   --bg-void: #000000;
   --bg-deep-purple: #050010;
   --bg-surface: #0a0a0f;
-  
+
   /* Text hierarchy */
   --text-primary: rgba(255, 255, 255, 0.9);
   --text-secondary: rgba(255, 255, 255, 0.6);
   --text-tertiary: rgba(255, 255, 255, 0.4);
   --text-muted: rgba(255, 255, 255, 0.2);
-  
+
   /* Accent colors */
   --accent-emerald: #10b981;
   --accent-emerald-glow: rgba(16, 185, 129, 0.4);
   --accent-rose: #f43f5e;
-  
+
   /* Glass materials */
   --glass-border: rgba(255, 255, 255, 0.1);
   --glass-border-highlight: rgba(255, 255, 255, 0.15);
   --glass-glow: rgba(255, 255, 255, 0.05);
   --glass-foil: rgba(255, 255, 255, 0.01);
-  
+
   /* Animation timings */
   --spring-stiff: cubic-bezier(0.34, 1.56, 0.64, 1);
   --spring-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -55,7 +55,8 @@ body {
 body {
   user-select: none;
   -webkit-user-select: none;
-  cursor: none; /* Custom cursor */
+  cursor: none;
+  /* Custom cursor */
 }
 
 /* ============================================================================
@@ -98,6 +99,7 @@ body {
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(200%);
   }
@@ -120,9 +122,12 @@ body {
 }
 
 @keyframes emerald-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 rgba(16, 185, 129, 0);
   }
+
   50% {
     box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
   }
@@ -145,7 +150,7 @@ body {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(40px) brightness(1.2);
   -webkit-backdrop-filter: blur(40px) brightness(1.2);
-  box-shadow: 
+  box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
@@ -203,9 +208,11 @@ body {
   0% {
     transform: rotate(0deg) scale(1);
   }
+
   50% {
     transform: rotate(180deg) scale(1.2);
   }
+
   100% {
     transform: rotate(360deg) scale(1);
   }
@@ -242,7 +249,7 @@ body {
 
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.4),
     0 30px 60px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
@@ -281,7 +288,10 @@ a {
    HIDE DEFAULT CURSOR ON INTERACTIVE ELEMENTS
    ============================================================================ */
 
-button, a, input, [role="button"] {
+button,
+a,
+input,
+[role="button"] {
   cursor: none;
 }
 
@@ -298,9 +308,12 @@ input[type="file"] {
    ============================================================================ */
 
 @keyframes grounded-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     border-color: rgba(255, 255, 255, 0.15);
   }
+
   50% {
     border-color: rgba(16, 185, 129, 0.3);
   }
@@ -315,9 +328,12 @@ input[type="file"] {
    ============================================================================ */
 
 @keyframes gentle-float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-3px);
   }

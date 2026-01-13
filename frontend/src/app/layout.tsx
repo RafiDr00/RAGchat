@@ -2,10 +2,10 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Zenith Stealth | Fortune 500 RAG System',
+  title: 'RAGchat',
   description: 'Ultra-minimal, high-fidelity enterprise knowledge interface with PDF, OCR, and intelligent retrieval',
   keywords: ['RAG', 'AI', 'Knowledge Base', 'Document Intelligence', 'Enterprise'],
-  authors: [{ name: 'Zenith Labs' }],
+  authors: [{ name: 'RAGchat' }],
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
   themeColor: '#000000',
 }
