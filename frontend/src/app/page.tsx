@@ -900,24 +900,20 @@ export default function ZenithStealth() {
           {!results && showUploadPrompt && documentCount === 0 && (
             <motion.div
               key="upload-prompt"
-              className="text-center"
+              className="text-center mb-12"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -30 }}
               transition={{ type: "spring", ...springConfig }}
             >
-              <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white/90 mb-4">
-                Upload documents first
-              </h1>
-              <p className="text-white/40 text-sm font-mono tracking-wide mb-6">
-                PDF • TXT • Images with OCR
+              <p className="text-white/40 text-sm font-mono tracking-wide">
+                Upload documents for grounded answers
               </p>
-              <BlinkingCursor />
             </motion.div>
           )}
 
-          {/* Query Input State */}
-          {!results && (!showUploadPrompt || documentCount > 0) && (
+          {/* Query Input State - Always Available */}
+          {!results && (
             <motion.div
               key="query-input"
               className="relative text-center max-w-5xl px-8"
