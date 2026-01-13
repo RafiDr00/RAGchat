@@ -896,89 +896,88 @@ export default function ZenithStealth() {
       {/* Neural Input Interface */}
       <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
         <AnimatePresence mode="wait">
-          {/* Upload Prompt State */}
-          {/* Upload Prompt */}
-          {!results && documentCount === 0 && (
-            <motion.div
-              key="upload-prompt"
-              className="text-center absolute top-1/3"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -30 }}
-              transition={{ type: "spring", ...springConfig }}
-            >
-              <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white/90 mb-4">
-                Upload documents first
-              </h1>
-              <p className="text-white/40 text-sm font-mono tracking-wide mb-6">
-                PDF • TXT • MD • CSV • JSON • XML • HTML • Images
-              </p>
-              <BlinkingCursor />
-            </motion.div>
-          )}
-
-          {/* Query Input State - Always Available */}
+          {/* Combined Layout - Upload Prompt + Query Input */}
           {!results && (
-            <motion.div
-              key="query-input"
-              className="relative text-center max-w-5xl px-8"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: "spring", ...springConfig }}
-            >
-              <NeuralShimmer active={isLoading}>
-                <div className="relative flex items-center justify-center">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    onFocus={() => setIsHoveringInteractive(true)}
-                    onBlur={() => setIsHoveringInteractive(false)}
-                    placeholder={isLoading ? "Neural processing..." : "Ask anything..."}
-                    disabled={isLoading}
-                    className="w-full bg-transparent border-none outline-none text-4xl md:text-6xl font-bold tracking-tight text-center text-white/90 placeholder-white/25 pr-16"
-                    style={{ caretColor: '#10b981' }}
-                  />
+            <div className="flex flex-col items-center justify-center w-full max-w-6xl px-8 space-y-16">
+              {/* Upload Prompt - Only when no documents */}
+              {documentCount === 0 && (
+                <motion.div
+                  className="text-center"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ type: "spring", ...springConfig }}
+                >
+                  <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white/90 mb-4">
+                    Upload documents first
+                  </h1>
+                  <p className="text-white/40 text-sm font-mono tracking-wide mb-6">
+                    PDF • TXT • MD • CSV • JSON • XML • HTML • Images
+                  </p>
+                  <BlinkingCursor />
+                </motion.div>
+              )}
 
-                  {/* Chevron Trigger */}
-                  <AnimatePresence>
-                    {query.length > 0 && (
-                      <motion.button
-                        onClick={handleSubmit}
-                        onMouseEnter={() => setIsHoveringInteractive(true)}
-                        onMouseLeave={() => setIsHoveringInteractive(false)}
-                        className="absolute right-0 p-4 rounded-full transition-colors"
-                        style={{ background: 'rgba(255, 255, 255, 0.05)' }}
-                        initial={{ opacity: 0, x: 30, scale: 0.8 }}
-                        animate={{ opacity: 1, x: 0, scale: 1 }}
-                        exit={{ opacity: 0, x: 30, scale: 0.8 }}
-                        whileHover={{
-                          scale: 1.1,
-                          background: 'rgba(16, 185, 129, 0.1)'
-                        }}
-                        whileTap={{ scale: 0.9 }}
-                        transition={{ type: 'spring', ...springConfig }}
-                      >
-                        <EmeraldChevron isValid={query.trim().length > 2} isLoading={isLoading} />
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </NeuralShimmer>
-
-              {/* Mode indicator */}
+              {/* Query Input - Always Available */}
               <motion.div
-                className="mt-6 text-[10px] font-mono tracking-[0.2em] text-white/30"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
+                className="relative text-center w-full max-w-5xl"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: "spring", ...springConfig, delay: documentCount === 0 ? 0.2 : 0 }}
               >
-                {ragEnabled ? 'GROUNDED MODE' : 'RAW LLM MODE'} • {documentCount} CHUNKS
+                <NeuralShimmer active={isLoading}>
+                  <div className="relative flex items-center justify-center">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      onFocus={() => setIsHoveringInteractive(true)}
+                      onBlur={() => setIsHoveringInteractive(false)}
+                      placeholder={isLoading ? "Neural processing..." : "Ask anything..."}
+                      disabled={isLoading}
+                      className="w-full bg-transparent border-none outline-none text-4xl md:text-6xl font-bold tracking-tight text-center text-white/90 placeholder-white/25 pr-16"
+                      style={{ caretColor: '#10b981' }}
+                    />
+
+                    {/* Chevron Trigger */}
+                    <AnimatePresence>
+                      {query.length > 0 && (
+                        <motion.button
+                          onClick={handleSubmit}
+                          onMouseEnter={() => setIsHoveringInteractive(true)}
+                          onMouseLeave={() => setIsHoveringInteractive(false)}
+                          className="absolute right-0 p-4 rounded-full transition-colors"
+                          style={{ background: 'rgba(255, 255, 255, 0.05)' }}
+                          initial={{ opacity: 0, x: 30, scale: 0.8 }}
+                          animate={{ opacity: 1, x: 0, scale: 1 }}
+                          exit={{ opacity: 0, x: 30, scale: 0.8 }}
+                          whileHover={{
+                            scale: 1.1,
+                            background: 'rgba(16, 185, 129, 0.1)'
+                          }}
+                          whileTap={{ scale: 0.9 }}
+                          transition={{ type: 'spring', ...springConfig }}
+                        >
+                          <EmeraldChevron isValid={query.trim().length > 2} isLoading={isLoading} />
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </NeuralShimmer>
+
+                {/* Mode indicator */}
+                <motion.div
+                  className="mt-6 text-[10px] font-mono tracking-[0.2em] text-white/30"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  {ragEnabled ? 'GROUNDED MODE' : 'RAW LLM MODE'} • {documentCount} CHUNKS
+                </motion.div>
               </motion.div>
-            </motion.div>
+            </div>
           )}
 
           {/* Results State - Collapsed Query */}
