@@ -896,37 +896,98 @@ export default function ZenithStealth() {
       {/* Neural Input Interface */}
       <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
         <AnimatePresence mode="wait">
-          {/* Combined Layout - Upload Prompt + Query Input */}
           {!results && (
-            <div className="flex flex-col items-center justify-center w-full max-w-6xl px-8 space-y-16">
-              {/* Upload Prompt - Only when no documents */}
+            <motion.div
+              className="flex flex-col items-center justify-center w-full max-w-6xl px-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              {/* Upload Prompt - Glassy 3D Style */}
               {documentCount === 0 && (
                 <motion.div
-                  className="text-center"
-                  initial={{ opacity: 0, y: -20 }}
+                  className="text-center mb-20"
+                  initial={{ opacity: 0, y: -30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ type: "spring", ...springConfig }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 25 }}
                 >
-                  <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white/90 mb-4">
-                    Upload documents first
+                  <h1
+                    className="text-6xl md:text-8xl font-black tracking-tighter mb-6"
+                    style={{
+                      color: '#ffffff',
+                      textShadow: `
+                        0 0 40px rgba(16, 185, 129, 0.3),
+                        0 0 80px rgba(16, 185, 129, 0.2),
+                        0 4px 8px rgba(0, 0, 0, 0.4),
+                        0 8px 16px rgba(0, 0, 0, 0.3),
+                        0 16px 32px rgba(0, 0, 0, 0.2),
+                        2px 2px 0px rgba(16, 185, 129, 0.1),
+                        4px 4px 0px rgba(0, 0, 0, 0.15)
+                      `,
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      filter: 'drop-shadow(0 4px 12px rgba(16, 185, 129, 0.2))'
+                    }}
+                  >
+                    Upload documents
                   </h1>
-                  <p className="text-white/40 text-sm font-mono tracking-wide mb-6">
-                    PDF • TXT • MD • CSV • JSON • XML • HTML • Images
-                  </p>
-                  <BlinkingCursor />
+                  <motion.div
+                    className="inline-block px-8 py-3 rounded-2xl"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      boxShadow: `
+                        0 8px 32px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1)
+                      `
+                    }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <p
+                      className="text-xs font-mono tracking-[0.3em]"
+                      style={{
+                        color: 'rgba(16, 185, 129, 0.8)',
+                        textShadow: '0 0 20px rgba(16, 185, 129, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3)'
+                      }}
+                    >
+                      PDF • TXT • MD • CSV • JSON • XML • HTML • IMAGES
+                    </p>
+                  </motion.div>
                 </motion.div>
               )}
 
-              {/* Query Input - Always Available */}
+              {/* Query Input - Glassy 3D */}
               <motion.div
                 className="relative text-center w-full max-w-5xl"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: "spring", ...springConfig, delay: documentCount === 0 ? 0.2 : 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 200, damping: 25, delay: documentCount === 0 ? 0.3 : 0 }}
               >
+                {/* Glassy backdrop */}
+                <div
+                  className="absolute inset-0 -m-8 rounded-3xl"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    backdropFilter: 'blur(40px)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    boxShadow: `
+                      0 20px 60px rgba(0, 0, 0, 0.4),
+                      0 40px 100px rgba(0, 0, 0, 0.3),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.05)
+                    `,
+                    zIndex: -1
+                  }}
+                />
+
                 <NeuralShimmer active={isLoading}>
-                  <div className="relative flex items-center justify-center">
+                  <div className="relative flex items-center justify-center py-6">
                     <input
                       ref={inputRef}
                       type="text"
@@ -935,10 +996,23 @@ export default function ZenithStealth() {
                       onKeyPress={handleKeyPress}
                       onFocus={() => setIsHoveringInteractive(true)}
                       onBlur={() => setIsHoveringInteractive(false)}
-                      placeholder={isLoading ? "Neural processing..." : "Ask anything..."}
+                      placeholder={isLoading ? "Processing..." : "Ask anything..."}
                       disabled={isLoading}
-                      className="w-full bg-transparent border-none outline-none text-4xl md:text-6xl font-bold tracking-tight text-center text-white/90 placeholder-white/25 pr-16"
-                      style={{ caretColor: '#10b981' }}
+                      className="w-full bg-transparent border-none outline-none text-5xl md:text-7xl font-black tracking-tight text-center pr-20"
+                      style={{
+                        caretColor: '#10b981',
+                        color: '#ffffff',
+                        textShadow: `
+                          0 0 40px rgba(16, 185, 129, 0.4),
+                          0 0 80px rgba(16, 185, 129, 0.2),
+                          0 4px 12px rgba(0, 0, 0, 0.5),
+                          0 8px 24px rgba(0, 0, 0, 0.4),
+                          0 16px 48px rgba(0, 0, 0, 0.3),
+                          2px 2px 0px rgba(16, 185, 129, 0.15),
+                          4px 4px 0px rgba(0, 0, 0, 0.2)
+                        `,
+                        WebkitTextStroke: '0.5px rgba(255, 255, 255, 0.1)'
+                      }}
                     />
 
                     {/* Chevron Trigger */}
@@ -948,16 +1022,29 @@ export default function ZenithStealth() {
                           onClick={handleSubmit}
                           onMouseEnter={() => setIsHoveringInteractive(true)}
                           onMouseLeave={() => setIsHoveringInteractive(false)}
-                          className="absolute right-0 p-4 rounded-full transition-colors"
-                          style={{ background: 'rgba(255, 255, 255, 0.05)' }}
+                          className="absolute right-0 p-4 rounded-2xl"
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            backdropFilter: 'blur(20px)',
+                            border: '1px solid rgba(16, 185, 129, 0.2)',
+                            boxShadow: `
+                              0 0 20px rgba(16, 185, 129, 0.3),
+                              0 8px 24px rgba(0, 0, 0, 0.4),
+                              inset 0 1px 0 rgba(255, 255, 255, 0.1)
+                            `
+                          }}
                           initial={{ opacity: 0, x: 30, scale: 0.8 }}
                           animate={{ opacity: 1, x: 0, scale: 1 }}
                           exit={{ opacity: 0, x: 30, scale: 0.8 }}
                           whileHover={{
                             scale: 1.1,
-                            background: 'rgba(16, 185, 129, 0.1)'
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            boxShadow: `
+                              0 0 30px rgba(16, 185, 129, 0.5),
+                              0 12px 32px rgba(0, 0, 0, 0.5)
+                            `
                           }}
-                          whileTap={{ scale: 0.9 }}
+                          whileTap={{ scale: 0.95 }}
                           transition={{ type: 'spring', ...springConfig }}
                         >
                           <EmeraldChevron isValid={query.trim().length > 2} isLoading={isLoading} />
@@ -967,17 +1054,36 @@ export default function ZenithStealth() {
                   </div>
                 </NeuralShimmer>
 
-                {/* Mode indicator */}
+                {/* Mode indicator - Glassy Badge */}
                 <motion.div
-                  className="mt-6 text-[10px] font-mono tracking-[0.2em] text-white/30"
+                  className="mt-8 inline-block px-6 py-2 rounded-full"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: `
+                      0 4px 16px rgba(0, 0, 0, 0.3),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.05)
+                    `
+                  }}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
+                  transition={{ delay: 0.5 }}
                 >
-                  {ragEnabled ? 'GROUNDED MODE' : 'RAW LLM MODE'} • {documentCount} CHUNKS
+                  <span
+                    className="text-[10px] font-mono tracking-[0.25em]"
+                    style={{
+                      color: ragEnabled ? 'rgba(16, 185, 129, 0.9)' : 'rgba(255, 255, 255, 0.5)',
+                      textShadow: ragEnabled
+                        ? '0 0 15px rgba(16, 185, 129, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)'
+                        : '0 2px 4px rgba(0, 0, 0, 0.3)'
+                    }}
+                  >
+                    {ragEnabled ? 'GROUNDED MODE' : 'RAW LLM MODE'} • {documentCount} CHUNKS
+                  </span>
                 </motion.div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
 
           {/* Results State - Collapsed Query */}
