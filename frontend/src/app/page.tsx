@@ -1,573 +1,1159 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
-import { Upload, Sparkles, CheckCircle2, ArrowRight, Loader, FileText, TrendingUp, Zap, AlertCircle, X } from 'lucide-react';
-import { useToast } from '@/components/Toast';
-import type { QueryResponse } from '@/lib/types';
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion'
+import { Upload, Loader2, FileText, Image as ImageIcon, File, X, ChevronRight } from 'lucide-react'
+import axios from 'axios'
 
 /* ============================================================================
-   STARFIELD COMPONENT - WARP DRIVE EFFECT with error state support
+   SPRING CONFIGURATION - Zenith Stealth Luxury Feel
+   Stiffness: 260, Damping: 20 - Snappy yet elegant
    ============================================================================ */
 
-const StarField: React.FC<{ warp: boolean; error?: boolean }> = ({ warp, error }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const starsRef = useRef<Array<{ x: number; y: number; z: number }>>([]);
-  const animationRef = useRef<number>();
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    starsRef.current = Array.from({ length: 100 }, () => ({
-      x: (Math.random() - 0.5) * canvas.width,
-      y: (Math.random() - 0.5) * canvas.height,
-      z: Math.random() * 500,
-    }));
-
-    const animate = () => {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const speed = warp ? 8 : 3;
-
-      starsRef.current.forEach((star) => {
-        star.z -= speed;
-        if (star.z <= 0) {
-          star.z = 500;
-          star.x = (Math.random() - 0.5) * canvas.width;
-          star.y = (Math.random() - 0.5) * canvas.height;
-        }
-
-        const scale = 500 / star.z;
-        const x = canvas.width / 2 + star.x * scale;
-        const y = canvas.height / 2 + star.y * scale;
-        const size = 2 * scale;
-
-        // Red stars for error state, white for normal
-        const color = error ? 'rgba(239, 68, 68,' : 'rgba(255, 255, 255,';
-        ctx.fillStyle = `${color} ${Math.max(0, 1 - star.z / 500)})`;
-        ctx.fillRect(x, y, size, size);
-      });
-
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [warp, error]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none"
-      style={{ background: warp ? '#000' : error ? '#7f1d1d' : 'transparent' }}
-    />
-  );
-};
-
-/* ============================================================================
-   ERROR MODAL COMPONENT - PRODUCTION: Display critical errors to users
-   ============================================================================ */
-
-interface ErrorModalProps {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  onClose: () => void;
+const springConfig = {
+  stiffness: 260,
+  damping: 20
 }
 
-const ErrorModal: React.FC<ErrorModalProps> = ({ isOpen, title, message, onClose }) => {
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
-        {/* Backdrop */}
-        <motion.div
-          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        />
-
-        {/* Modal */}
-        <motion.div
-          className="relative bg-gradient-to-br from-red-950/95 to-red-900/95 border border-red-700/50 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl"
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        >
-          <div className="flex items-start gap-4">
-            <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-1" />
-            <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-red-100 mb-2">{title}</h3>
-              <p className="text-red-200/90 text-sm leading-relaxed break-words whitespace-normal">{message}</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="flex-shrink-0 p-1 hover:bg-red-800/50 rounded transition-colors"
-            >
-              <X className="w-5 h-5 text-red-300" />
-            </button>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="mt-4 w-full px-4 py-2 bg-red-600/50 hover:bg-red-600 text-red-100 font-medium rounded-lg transition-colors"
-          >
-            Dismiss
-          </button>
-        </motion.div>
-      </div>
-    </AnimatePresence>
-  );
-};
+const gentleSpring = {
+  stiffness: 100,
+  damping: 20
+}
 
 /* ============================================================================
-   MAIN COMPONENT - PRODUCTION HARDENED
+   MAGNETIC CUSTOM CURSOR - Emerald Circle on Interactive Elements
    ============================================================================ */
 
-export default function Home() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isProcessingUpload, setIsProcessingUpload] = useState(false);
-  const [queryResult, setQueryResult] = useState<QueryResponse | null>(null);
-  const [hasUploaded, setHasUploaded] = useState(false);
-  const [documentCount, setDocumentCount] = useState(0);
-  const [useRAG, setUseRAG] = useState(true);
-  
-  // PRODUCTION: Error modal state
-  const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
-  
-  // PRODUCTION: AbortController for request cancellation
-  const abortControllerRef = useRef<AbortController | null>(null);
+const MagneticCursor: React.FC<{ isHoveringInteractive: boolean }> = ({ isHoveringInteractive }) => {
+  const cursorX = useMotionValue(-100)
+  const cursorY = useMotionValue(-100)
 
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const { addToast } = useToast();
+  const springX = useSpring(cursorX, { stiffness: 500, damping: 28 })
+  const springY = useSpring(cursorY, { stiffness: 500, damping: 28 })
 
-  // Health check callback - poll for document availability
-  const checkHealth = useCallback(async () => {
-    try {
-      const response = await axios.get(`/api/health`);
-      if (response.data.documents > 0) {
-        setHasUploaded(true);
-        setDocumentCount(response.data.documents);
-      }
-    } catch (err) {
-      // Silent fail - continue polling
-    }
-  }, []);
-
-  // Health check polling on mount and every 5 seconds
   useEffect(() => {
-    checkHealth();
-    const interval = setInterval(checkHealth, 5000);
-    return () => clearInterval(interval);
-  }, [checkHealth]);
-
-  // Focus search input on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Cleanup AbortController on unmount
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
-  // Handle file upload via drag-drop
-  const handleUpload = useCallback(
-    async (files: FileList) => {
-      setIsDragging(false);
-      const file = files[0];
-      if (!file) return;
-
-      setIsProcessingUpload(true);
-
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await axios.post(`/api/ingest`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-
-        setHasUploaded(true);
-        setDocumentCount((prev) => prev + response.data.chunks_created);
-        addToast(
-          `✓ Successfully uploaded ${response.data.document_name} (${response.data.chunks_created} chunks)`,
-          'success'
-        );
-        // Refresh health check after upload
-        setTimeout(() => checkHealth(), 500);
-      } catch (err) {
-        let errorMessage = 'Upload failed';
-        
-        if (axios.isAxiosError(err)) {
-          if (err.response?.status === 413) {
-            errorMessage = 'File too large. Maximum size is 10MB.';
-          } else if (err.response?.status === 429) {
-            errorMessage = 'Too many uploads. Please wait before uploading again.';
-          } else {
-            errorMessage = err.response?.data?.error || err.response?.data?.details || errorMessage;
-          }
-        }
-
-        // PRODUCTION: Show error modal instead of just toast
-        setErrorModal({
-          isOpen: true,
-          title: 'Upload Error',
-          message: errorMessage,
-        });
-        
-        addToast(errorMessage, 'error');
-      } finally {
-        setIsProcessingUpload(false);
-      }
-    },
-    [addToast, checkHealth]
-  );
-
-  // Handle search/query - PRODUCTION: Use AbortController for cancellation
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim() || isLoading) {
-      if (documentCount === 0) {
-        addToast('Upload a document first', 'error');
-      }
-      return;
+    const moveCursor = (e: MouseEvent) => {
+      cursorX.set(e.clientX)
+      cursorY.set(e.clientY)
     }
 
-    setIsLoading(true);
-
-    try {
-      // PRODUCTION: Cancel previous request if still pending
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      // Create new AbortController for this request
-      abortControllerRef.current = new AbortController();
-
-      const response = await axios.post(
-        `/api/chat`,
-        {
-          question: searchQuery,
-          useRAG,
-        },
-        {
-          signal: abortControllerRef.current.signal,
-        }
-      );
-
-      // Only update state if this request wasn't cancelled
-      if (!abortControllerRef.current.signal.aborted) {
-        setQueryResult(response.data);
-        setSearchQuery('');
-        addToast(`✓ Query completed in ${response.data.processing_time}ms`, 'success');
-      }
-    } catch (err) {
-      // Ignore abort errors (expected when cancelling)
-      if (axios.isCancel(err)) {
-        console.log('Query cancelled');
-        return;
-      }
-
-      let errorTitle = 'Query Error';
-      let errorMessage = 'Query failed';
-
-      if (axios.isAxiosError(err)) {
-        if (err.response?.status === 429) {
-          errorTitle = 'Rate Limited';
-          errorMessage = 'Too many queries. Please wait before trying again (max 10 per minute).';
-        } else if (err.response?.status === 500) {
-          errorTitle = 'Server Error';
-          errorMessage = err.response?.data?.details || 'Internal server error occurred';
-        } else {
-          errorMessage = err.response?.data?.error || errorMessage;
-        }
-      }
-
-      // PRODUCTION: Show error modal
-      setErrorModal({
-        isOpen: true,
-        title: errorTitle,
-        message: errorMessage,
-      });
-
-      addToast(errorMessage, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [searchQuery, isLoading, hasUploaded, useRAG, addToast, documentCount]);
-
-  // Handle Enter key in search
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !isLoading && hasUploaded) {
-      handleSearch();
-    }
-  };
-
-  // Drag and drop handlers
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files) {
-      handleUpload(e.dataTransfer.files);
-    }
-  };
+    window.addEventListener('mousemove', moveCursor)
+    return () => window.removeEventListener('mousemove', moveCursor)
+  }, [cursorX, cursorY])
 
   return (
-    <div className="min-h-screen text-zinc-50 overflow-hidden" style={{ background: 'linear-gradient(135deg, var(--bg-primary), var(--bg-secondary), var(--bg-tertiary))' }}>
-      <StarField warp={isLoading} error={errorModal.isOpen} />
-
-      {/* PRODUCTION: Error Modal */}
-      <ErrorModal
-        isOpen={errorModal.isOpen}
-        title={errorModal.title}
-        message={errorModal.message}
-        onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+    <motion.div
+      className="fixed pointer-events-none z-[9999]"
+      style={{
+        x: springX,
+        y: springY,
+        translateX: '-50%',
+        translateY: '-50%',
+      }}
+    >
+      <motion.div
+        className="rounded-full"
+        animate={{
+          width: isHoveringInteractive ? 40 : 12,
+          height: isHoveringInteractive ? 40 : 12,
+          backgroundColor: isHoveringInteractive ? 'transparent' : '#10b981',
+          borderWidth: isHoveringInteractive ? 2 : 0,
+          borderColor: '#10b981',
+          boxShadow: isHoveringInteractive
+            ? '0 0 20px rgba(16, 185, 129, 0.4)'
+            : '0 0 10px rgba(16, 185, 129, 0.3)',
+        }}
+        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+        style={{
+          borderStyle: 'solid',
+          mixBlendMode: isHoveringInteractive ? 'normal' : 'difference'
+        }}
       />
+    </motion.div>
+  )
+}
 
-      {/* HEADER */}
-      <motion.header className="fixed top-0 left-0 right-0 z-40 backdrop-blur-xl" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)' }}>
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Sparkles className="w-6 h-6" style={{ color: 'var(--accent-info)' }} />
-            <div>
-              <h1 className="text-xl font-bold" style={{ background: `linear-gradient(90deg, var(--accent-info), #06b6d4)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                RAG Studio
-              </h1>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Intelligent Retrieval Engine</p>
-            </div>
-          </div>
+/* ============================================================================
+   VOLUMETRIC SPACE - Deep Space Warp with Chromatic Aberration
+   ============================================================================ */
 
-          <motion.div className="flex items-center gap-4">
-            {hasUploaded && (
+interface VolumetricSpaceProps {
+  speed: number
+  loading: boolean
+}
+
+const VolumetricSpace: React.FC<VolumetricSpaceProps> = ({ speed, loading }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const animationRef = useRef<number | undefined>()
+  const starsRef = useRef<Array<{
+    x: number
+    y: number
+    z: number
+    prevX?: number
+    prevY?: number
+    opacity: number
+    velocity: number
+    hue: number
+  }>>([])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+    }
+
+    resizeCanvas()
+    window.addEventListener('resize', resizeCanvas)
+
+    // Initialize 1500 high-density stars with color variation
+    if (starsRef.current.length === 0) {
+      starsRef.current = Array.from({ length: 1500 }, () => ({
+        x: (Math.random() - 0.5) * 6000,
+        y: (Math.random() - 0.5) * 6000,
+        z: Math.random() * 3000,
+        opacity: Math.random() * 0.9 + 0.1,
+        velocity: 0,
+        hue: Math.random() * 60 + 200 // Blue to purple hues
+      }))
+    }
+
+    const animate = () => {
+      // Deep space void with subtle fade
+      ctx.fillStyle = 'rgba(5, 0, 16, 0.06)'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      const currentSpeed = loading ? 30.0 : speed
+      const warpIntensity = currentSpeed / 30.0
+
+      // Deep Purple Radial Fog - Expands with warp
+      if (warpIntensity > 0.2) {
+        const fogRadius = 300 + (warpIntensity * 200)
+        const fogGradient = ctx.createRadialGradient(
+          canvas.width / 2, canvas.height / 2, 0,
+          canvas.width / 2, canvas.height / 2, fogRadius
+        )
+        fogGradient.addColorStop(0, `rgba(5, 0, 16, ${0.15 * warpIntensity})`)
+        fogGradient.addColorStop(0.5, `rgba(10, 0, 30, ${0.08 * warpIntensity})`)
+        fogGradient.addColorStop(1, 'rgba(5, 0, 16, 0)')
+
+        ctx.fillStyle = fogGradient
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      }
+
+      starsRef.current.forEach(star => {
+        star.prevX = canvas.width / 2 + (star.x * 1500) / star.z
+        star.prevY = canvas.height / 2 + (star.y * 1500) / star.z
+
+        star.z -= currentSpeed
+        star.velocity = currentSpeed
+
+        if (star.z <= 0) {
+          star.z = 3000
+          star.x = (Math.random() - 0.5) * 6000
+          star.y = (Math.random() - 0.5) * 6000
+          star.hue = Math.random() * 60 + 200
+        }
+
+        const x = canvas.width / 2 + (star.x * 1500) / star.z
+        const y = canvas.height / 2 + (star.y * 1500) / star.z
+        const size = Math.max(0.5, (3000 - star.z) / 1000)
+
+        // Chromatic Aberration + Motion Blur Trail
+        if (loading && star.prevX !== undefined && star.prevY !== undefined) {
+          const aberrationOffset = warpIntensity * 3
+          const trailOpacity = star.opacity * 0.7
+
+          // Rounded line cap for motion blur effect
+          ctx.lineCap = 'round'
+
+          // Red channel (offset left)
+          ctx.strokeStyle = `rgba(255, 80, 80, ${trailOpacity * 0.5})`
+          ctx.lineWidth = size * 0.8
+          ctx.beginPath()
+          ctx.moveTo(star.prevX - aberrationOffset, star.prevY)
+          ctx.lineTo(x - aberrationOffset * 0.3, y)
+          ctx.stroke()
+
+          // Green/White channel (center - brightest)
+          ctx.strokeStyle = `rgba(255, 255, 255, ${trailOpacity})`
+          ctx.lineWidth = size
+          ctx.beginPath()
+          ctx.moveTo(star.prevX, star.prevY)
+          ctx.lineTo(x, y)
+          ctx.stroke()
+
+          // Blue channel (offset right)
+          ctx.strokeStyle = `rgba(80, 80, 255, ${trailOpacity * 0.5})`
+          ctx.lineWidth = size * 0.8
+          ctx.beginPath()
+          ctx.moveTo(star.prevX + aberrationOffset, star.prevY)
+          ctx.lineTo(x + aberrationOffset * 0.3, y)
+          ctx.stroke()
+
+        } else {
+          // Normal star with subtle motion blur
+          ctx.lineCap = 'round'
+          const blur = Math.min(8, star.velocity * 0.15)
+
+          if (star.prevX !== undefined && star.prevY !== undefined && star.velocity > 1) {
+            // Draw motion trail
+            const gradient = ctx.createLinearGradient(star.prevX, star.prevY, x, y)
+            gradient.addColorStop(0, `rgba(255, 255, 255, 0)`)
+            gradient.addColorStop(1, `rgba(255, 255, 255, ${star.opacity})`)
+
+            ctx.strokeStyle = gradient
+            ctx.lineWidth = size
+            ctx.beginPath()
+            ctx.moveTo(star.prevX, star.prevY)
+            ctx.lineTo(x, y)
+            ctx.stroke()
+          }
+
+          // Star point with glow
+          ctx.shadowColor = `rgba(255, 255, 255, ${star.opacity})`
+          ctx.shadowBlur = blur
+          ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`
+          ctx.beginPath()
+          ctx.arc(x, y, size * 0.6, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.shadowBlur = 0
+        }
+      })
+
+      animationRef.current = requestAnimationFrame(animate)
+    }
+
+    animate()
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas)
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+    }
+  }, [speed, loading])
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 w-full h-full"
+        style={{ zIndex: 0 }}
+      />
+      {/* Radial vignette overlay */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: 1,
+          background: 'radial-gradient(ellipse 70% 50% at 50% 50%, transparent 0%, rgba(0,0,0,0.8) 100%)'
+        }}
+      />
+    </>
+  )
+}
+
+/* ============================================================================
+   NEURAL SHIMMER - Loading Text Animation
+   ============================================================================ */
+
+const NeuralShimmer: React.FC<{ children: React.ReactNode; active: boolean }> = ({ children, active }) => {
+  if (!active) return <>{children}</>
+
+  return (
+    <div className="relative overflow-hidden">
+      <div className="relative z-10">{children}</div>
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+          maskImage: 'linear-gradient(to right, transparent, black, transparent)',
+          WebkitMaskImage: 'linear-gradient(to right, transparent, black, transparent)'
+        }}
+        animate={{ x: ['-100%', '200%'] }}
+        transition={{
+          duration: 1.5,
+          repeat: Infinity,
+          ease: 'linear'
+        }}
+      />
+    </div>
+  )
+}
+
+/* ============================================================================
+   EMERALD CHEVRON - Glowing Submit Trigger
+   ============================================================================ */
+
+const EmeraldChevron: React.FC<{ isValid: boolean; isLoading: boolean }> = ({ isValid, isLoading }) => {
+  if (isLoading) {
+    return (
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 0.6, repeat: Infinity, ease: 'linear' }}
+      >
+        <Loader2 size={22} className="text-emerald-500" />
+      </motion.div>
+    )
+  }
+
+  return (
+    <motion.svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      animate={isValid ? {
+        filter: [
+          'drop-shadow(0 0 0 rgba(16, 185, 129, 0))',
+          'drop-shadow(0 0 12px rgba(16, 185, 129, 0.6))',
+          'drop-shadow(0 0 0 rgba(16, 185, 129, 0))'
+        ]
+      } : {}}
+      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+    >
+      <path
+        d="m9 18 6-6-6-6"
+        stroke={isValid ? '#10b981' : '#6b7280'}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </motion.svg>
+  )
+}
+
+/* ============================================================================
+   RELEVANCE PROGRESS RING - SVG Match Score
+   ============================================================================ */
+
+const RelevanceRing: React.FC<{ percentage: number }> = ({ percentage }) => {
+  const circumference = 2 * Math.PI * 10
+  const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`
+
+  return (
+    <div className="absolute top-3 right-3 w-8 h-8">
+      <svg width="32" height="32" viewBox="0 0 32 32" className="transform -rotate-90">
+        {/* Background ring */}
+        <circle
+          cx="16"
+          cy="16"
+          r="10"
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.08)"
+          strokeWidth="2"
+        />
+        {/* Progress ring */}
+        <motion.circle
+          cx="16"
+          cy="16"
+          r="10"
+          fill="none"
+          stroke="#10b981"
+          strokeWidth="2"
+          strokeLinecap="round"
+          initial={{ strokeDasharray: `0 ${circumference}` }}
+          animate={{ strokeDasharray }}
+          transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
+          style={{
+            filter: 'drop-shadow(0 0 4px rgba(16, 185, 129, 0.5))'
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-[10px] font-mono text-emerald-400 font-medium">
+          {Math.round(percentage)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================================
+   LENS TOGGLE - Glass Pill with Magnification Effect
+   ============================================================================ */
+
+interface LensToggleProps {
+  enabled: boolean
+  onToggle: () => void
+  onHover: (hovering: boolean) => void
+}
+
+const LensToggle: React.FC<LensToggleProps> = ({ enabled, onToggle, onHover }) => {
+  return (
+    <div className="flex items-center space-x-4">
+      <span
+        className={`text-[10px] font-mono tracking-[0.2em] transition-colors duration-300 ${!enabled ? 'text-white/70' : 'text-white/30'
+          }`}
+      >
+        RAW
+      </span>
+
+      <motion.button
+        onClick={onToggle}
+        onMouseEnter={() => onHover(true)}
+        onMouseLeave={() => onHover(false)}
+        className="relative w-16 h-8 rounded-full overflow-hidden"
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}
+        animate={enabled ? {
+          borderColor: [
+            'rgba(255, 255, 255, 0.1)',
+            'rgba(16, 185, 129, 0.4)',
+            'rgba(255, 255, 255, 0.1)'
+          ]
+        } : {}}
+        transition={enabled ? { duration: 2.5, repeat: Infinity, ease: 'easeInOut' } : {}}
+      >
+        {/* Glass Lens Handle */}
+        <motion.div
+          className="absolute top-1 w-6 h-6 rounded-full"
+          style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(40px) brightness(1.2)',
+            boxShadow: `
+              0 2px 10px rgba(0, 0, 0, 0.4),
+              inset 0 1px 0 rgba(255, 255, 255, 0.25)
+            `,
+            border: '1px solid rgba(255, 255, 255, 0.15)'
+          }}
+          animate={{ x: enabled ? 34 : 2 }}
+          transition={{ type: 'spring', ...springConfig }}
+        >
+          {/* Magnification shimmer effect */}
+          <div
+            className="absolute inset-0.5 rounded-full"
+            style={{
+              background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15) 0%, transparent 60%)'
+            }}
+          />
+        </motion.div>
+      </motion.button>
+
+      <span
+        className={`text-[10px] font-mono tracking-[0.2em] transition-colors duration-300 ${enabled ? 'text-emerald-400' : 'text-white/30'
+          }`}
+        style={enabled ? { textShadow: '0 0 10px rgba(16, 185, 129, 0.4)' } : {}}
+      >
+        GROUNDED
+      </span>
+    </div>
+  )
+}
+
+/* ============================================================================
+   GLASS CONTROL DOCK - The Lens Toggle & Upload
+   ============================================================================ */
+
+interface GlassDockProps {
+  onFileUpload: (file: File) => void
+  ragEnabled: boolean
+  onToggleRAG: () => void
+  documentCount: number
+  uploadProgress: number | null
+  isLoading: boolean
+  onHoverInteractive: (hovering: boolean) => void
+}
+
+const GlassDock: React.FC<GlassDockProps> = ({
+  onFileUpload,
+  ragEnabled,
+  onToggleRAG,
+  documentCount,
+  uploadProgress,
+  isLoading,
+  onHoverInteractive
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setIsProcessing(true)
+      await onFileUpload(file)
+      setTimeout(() => setIsProcessing(false), 500)
+    }
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const getFileIcon = (type: string) => {
+    if (type.includes('pdf')) return <FileText size={16} />
+    if (type.includes('image')) return <ImageIcon size={16} />
+    return <File size={16} />
+  }
+
+  return (
+    <motion.div
+      className="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-50"
+      initial={{ y: 100, opacity: 0 }}
+      animate={{
+        y: isLoading ? [0, -4, 0] : 0,
+        opacity: 1
+      }}
+      transition={{
+        y: isLoading ? {
+          duration: 2.5,
+          repeat: Infinity,
+          ease: "easeInOut"
+        } : {
+          type: "spring",
+          ...springConfig
+        },
+        opacity: { type: "spring", ...springConfig }
+      }}
+    >
+      <motion.div
+        className="flex items-center space-x-6 px-8 py-4 rounded-2xl"
+        style={{
+          background: 'rgba(255, 255, 255, 0.01)',
+          backdropFilter: 'blur(60px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderTopColor: 'rgba(255, 255, 255, 0.15)',
+          boxShadow: `
+            0 4px 24px rgba(0, 0, 0, 0.5),
+            0 20px 50px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1)
+          `
+        }}
+        animate={ragEnabled ? {
+          borderColor: [
+            'rgba(255, 255, 255, 0.1)',
+            'rgba(16, 185, 129, 0.25)',
+            'rgba(255, 255, 255, 0.1)'
+          ]
+        } : {}}
+        transition={ragEnabled ? { duration: 3, repeat: Infinity, ease: 'easeInOut' } : {}}
+      >
+        {/* Upload Button with Processing Animation */}
+        <div className="relative">
+          <motion.button
+            onClick={() => fileInputRef.current?.click()}
+            onMouseEnter={() => {
+              setShowTooltip(true)
+              onHoverInteractive(true)
+            }}
+            onMouseLeave={() => {
+              setShowTooltip(false)
+              onHoverInteractive(false)
+            }}
+            className="flex items-center space-x-3 p-3 rounded-xl transition-colors"
+            style={{ background: 'rgba(255, 255, 255, 0.05)' }}
+            whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <motion.div
+              animate={isProcessing ? {
+                rotate: 360,
+                scale: [1, 1.2, 1]
+              } : {}}
+              transition={isProcessing ? {
+                rotate: { duration: 0.5, repeat: Infinity, ease: 'linear' },
+                scale: { duration: 0.5, repeat: Infinity }
+              } : {}}
+            >
+              <Upload size={18} className="text-white/80" />
+            </motion.div>
+
+            {/* Status Pulse Dot */}
+            <motion.div
+              className={`w-2 h-2 rounded-full ${documentCount > 0 ? 'bg-emerald-500' : 'bg-zinc-500'
+                }`}
+              animate={{
+                scale: documentCount > 0 ? [1, 1.3, 1] : 1,
+                opacity: documentCount > 0 ? [0.7, 1, 0.7] : 0.4,
+              }}
+              style={documentCount > 0 ? {
+                boxShadow: '0 0 8px rgba(16, 185, 129, 0.6)'
+              } : {}}
+              transition={{
+                duration: 2.5,
+                repeat: Infinity,
+                ease: 'easeInOut'
+              }}
+            />
+          </motion.button>
+
+          {/* Enhanced Tooltip */}
+          <AnimatePresence>
+            {showTooltip && (
               <motion.div
-                className="px-3 py-1.5 rounded-lg flex items-center gap-2 border" style={{ background: `linear-gradient(90deg, rgba(16,185,129,0.1), rgba(20,184,166,0.1))`, borderColor: 'rgba(16,185,129,0.3)' }}
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
+                className="absolute bottom-full mb-3 left-1/2 transform -translate-x-1/2 px-4 py-2.5 rounded-xl"
+                style={{
+                  background: 'rgba(0, 0, 0, 0.9)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  minWidth: '160px'
+                }}
+                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                transition={{ type: 'spring', ...springConfig }}
               >
-                <FileText className="w-4 h-4" style={{ color: 'var(--accent-success)' }} />
-                <span className="text-sm font-medium" style={{ color: 'rgba(16,185,129,0.8)' }}>
-                  {documentCount} document{documentCount !== 1 ? 's' : ''}
-                </span>
+                <div className="text-xs text-white/90 font-medium mb-1">
+                  {documentCount > 0 ? `${documentCount} chunks indexed` : 'No documents'}
+                </div>
+                <div className="text-[10px] text-white/50 font-mono tracking-wide">
+                  PDF • TXT • Images (OCR)
+                </div>
               </motion.div>
             )}
-          </motion.div>
+          </AnimatePresence>
         </div>
-      </motion.header>
 
-      {/* MAIN CONTENT */}
-      <main className="relative pt-24 pb-12 px-6">
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* UPLOAD SECTION - Only visible when no docs indexed */}
-          {documentCount === 0 && (
+        {/* Upload Progress */}
+        <AnimatePresence>
+          {uploadProgress !== null && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-center space-y-6"
+              className="flex items-center space-x-3"
+              initial={{ opacity: 0, scale: 0.8, x: -20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.8, x: -20 }}
+              transition={{ type: 'spring', ...springConfig }}
             >
-              <motion.div
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                className="relative px-8 py-16 rounded-2xl border-2 border-dashed transition-all cursor-pointer"
-                style={{
-                  borderColor: isDragging ? 'var(--accent-info)' : 'rgba(63,63,70,0.5)',
-                  background: isDragging ? 'rgba(6,182,212,0.05)' : 'rgba(0,0,0,0.3)',
-                }}
+              <div
+                className="w-24 h-1.5 rounded-full overflow-hidden"
+                style={{ background: 'rgba(255, 255, 255, 0.1)' }}
               >
-                <input
-                  type="file"
-                  onChange={(e) => e.target.files && handleUpload(e.target.files)}
-                  className="hidden"
-                  id="file-input"
-                  accept=".txt,.pdf"
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{
+                    background: 'linear-gradient(90deg, #10b981, #34d399)',
+                    boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)'
+                  }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${uploadProgress}%` }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
                 />
-                <label htmlFor="file-input" className="cursor-pointer block">
-                  <motion.div
-                    animate={{ scale: isProcessingUpload ? 1.1 : 1 }}
-                    className="space-y-4"
-                  >
-                    <Upload className="w-12 h-12 mx-auto" style={{ color: 'var(--accent-info)' }} />
-                    <div>
-                      <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {isProcessingUpload ? 'Processing...' : 'Upload Your Documents'}
-                      </p>
-                      <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                        Drag and drop .txt or .pdf files here (max 10MB) or click to select
-                      </p>
-                    </div>
-                  </motion.div>
-                </label>
+              </div>
+              <span className="text-[10px] text-emerald-400 font-mono tracking-[0.15em]">
+                SCANNING
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Lens Toggle */}
+        <LensToggle
+          enabled={ragEnabled}
+          onToggle={onToggleRAG}
+          onHover={onHoverInteractive}
+        />
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.pdf,.png,.jpg,.jpeg,.tiff,.bmp,.gif,.webp,.md,.csv,.json"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/* ============================================================================
+   GLASS-FOIL RESULT CARD - Ultra-minimal with Relevance Rings
+   ============================================================================ */
+
+interface GlassFoilCardProps {
+  children: React.ReactNode
+  glowColor: string
+  isActive: boolean
+  relevanceScore?: number
+  delay?: number
+}
+
+const GlassFoilCard: React.FC<GlassFoilCardProps> = ({
+  children,
+  glowColor,
+  isActive,
+  relevanceScore,
+  delay = 0
+}) => {
+  return (
+    <motion.div
+      className="relative rounded-xl overflow-hidden"
+      style={{
+        background: 'rgba(255, 255, 255, 0.01)',
+        backdropFilter: 'blur(60px)',
+        border: '1px solid transparent',
+        borderTopColor: 'rgba(255, 255, 255, 0.15)',
+        borderLeftColor: 'rgba(255, 255, 255, 0.05)',
+        borderRightColor: 'rgba(255, 255, 255, 0.05)',
+        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+        boxShadow: `
+          0 4px 24px rgba(0, 0, 0, 0.4),
+          0 20px 50px rgba(0, 0, 0, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1)
+        `
+      }}
+      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', ...springConfig, delay }}
+      whileHover={{
+        y: -3,
+        boxShadow: `
+          0 8px 32px rgba(0, 0, 0, 0.5),
+          0 32px 64px rgba(0, 0, 0, 0.3),
+          inset 0 1px 0 rgba(255, 255, 255, 0.15)
+        `
+      }}
+    >
+      {/* Relevance Score Ring */}
+      {relevanceScore !== undefined && (
+        <RelevanceRing percentage={relevanceScore} />
+      )}
+
+      {/* Content */}
+      <div className="relative z-10">
+        {children}
+      </div>
+
+      {/* Subtle glow overlay */}
+      {isActive && (
+        <motion.div
+          className="absolute inset-0 rounded-xl pointer-events-none"
+          style={{
+            background: `linear-gradient(135deg, transparent, ${glowColor}10, transparent)`
+          }}
+          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      )}
+    </motion.div>
+  )
+}
+
+/* ============================================================================
+   BLINKING CURSOR
+   ============================================================================ */
+
+const BlinkingCursor: React.FC = () => (
+  <motion.div
+    className="inline-block w-0.5 h-14 bg-emerald-500 ml-2"
+    animate={{ opacity: [1, 0.2, 1] }}
+    transition={{
+      duration: 1.2,
+      ease: "easeInOut",
+      repeat: Infinity
+    }}
+    style={{ boxShadow: '0 0 10px rgba(16, 185, 129, 0.4)' }}
+  />
+)
+
+/* ============================================================================
+   MAIN INTERFACE - Zenith Stealth Canvas
+   ============================================================================ */
+
+interface QueryResult {
+  rag_answer: string
+  llm_only: string
+  retrieved_chunks?: Array<{
+    doc: string
+    text: string
+    match: number
+  }>
+  processing_time?: number
+  mode?: string
+}
+
+export default function ZenithStealth() {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<QueryResult | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [ragEnabled, setRagEnabled] = useState(true)
+  const [documentCount, setDocumentCount] = useState(0)
+  const [showUploadPrompt, setShowUploadPrompt] = useState(true)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [currentQuery, setCurrentQuery] = useState('')
+  const [isHoveringInteractive, setIsHoveringInteractive] = useState(false)
+  const [capabilities, setCapabilities] = useState<any>(null)
+
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Health polling every 5s
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await axios.get('/api/health')
+        const chunkCount = response.data.chunks || 0
+        setDocumentCount(chunkCount)
+        if (chunkCount > 0 && showUploadPrompt) {
+          setShowUploadPrompt(false)
+        }
+        if (response.data.capabilities) {
+          setCapabilities(response.data.capabilities)
+        }
+      } catch (error) {
+        // Silent fail - backend may not be ready
+      }
+    }
+
+    checkHealth()
+    const interval = setInterval(checkHealth, 5000)
+    return () => clearInterval(interval)
+  }, [showUploadPrompt])
+
+  const handleFileUpload = async (file: File) => {
+    setUploadProgress(0)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      // Progressive scanning animation
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => prev !== null ? Math.min(prev + 6, 90) : 6)
+      }, 100)
+
+      const response = await axios.post('/api/ingest', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+
+      setTimeout(() => {
+        setUploadProgress(null)
+        setDocumentCount(response.data.total_chunks || documentCount + response.data.chunks_created)
+        if (showUploadPrompt) setShowUploadPrompt(false)
+      }, 800)
+
+    } catch (error: any) {
+      setUploadProgress(null)
+      console.error('Upload failed:', error?.response?.data?.detail || error.message)
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!query.trim() || isLoading) return
+
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    setCurrentQuery(query)
+    setIsLoading(true)
+
+    try {
+      const response = await axios.post('/api/chat', {
+        question: query,
+        useRAG: ragEnabled
+      }, {
+        signal: controller.signal
+      })
+
+      setResults(response.data)
+    } catch (error) {
+      if (!axios.isCancel(error)) {
+        console.error('Query failed:', error)
+      }
+    } finally {
+      setIsLoading(false)
+      abortControllerRef.current = null
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
+  const clearResults = () => {
+    setResults(null)
+    setQuery('')
+    setCurrentQuery('')
+    inputRef.current?.focus()
+  }
+
+  return (
+    <div className="fixed inset-0 w-full h-full overflow-hidden">
+      {/* Magnetic Custom Cursor */}
+      <MagneticCursor isHoveringInteractive={isHoveringInteractive} />
+
+      {/* Volumetric Space Background */}
+      <VolumetricSpace speed={0.8} loading={isLoading} />
+
+      {/* Neural Input Interface */}
+      <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
+        <AnimatePresence mode="wait">
+          {/* Upload Prompt State */}
+          {!results && showUploadPrompt && documentCount === 0 && (
+            <motion.div
+              key="upload-prompt"
+              className="text-center"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ type: "spring", ...springConfig }}
+            >
+              <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white/90 mb-4">
+                Upload documents first
+              </h1>
+              <p className="text-white/40 text-sm font-mono tracking-wide mb-6">
+                PDF • TXT • Images with OCR
+              </p>
+              <BlinkingCursor />
+            </motion.div>
+          )}
+
+          {/* Query Input State */}
+          {!results && (!showUploadPrompt || documentCount > 0) && (
+            <motion.div
+              key="query-input"
+              className="relative text-center max-w-5xl px-8"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", ...springConfig }}
+            >
+              <NeuralShimmer active={isLoading}>
+                <div className="relative flex items-center justify-center">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    onFocus={() => setIsHoveringInteractive(true)}
+                    onBlur={() => setIsHoveringInteractive(false)}
+                    placeholder={isLoading ? "Neural processing..." : "Ask anything..."}
+                    disabled={isLoading}
+                    className="w-full bg-transparent border-none outline-none text-4xl md:text-6xl font-bold tracking-tight text-center text-white/90 placeholder-white/25 pr-16"
+                    style={{ caretColor: '#10b981' }}
+                  />
+
+                  {/* Chevron Trigger */}
+                  <AnimatePresence>
+                    {query.length > 0 && (
+                      <motion.button
+                        onClick={handleSubmit}
+                        onMouseEnter={() => setIsHoveringInteractive(true)}
+                        onMouseLeave={() => setIsHoveringInteractive(false)}
+                        className="absolute right-0 p-4 rounded-full transition-colors"
+                        style={{ background: 'rgba(255, 255, 255, 0.05)' }}
+                        initial={{ opacity: 0, x: 30, scale: 0.8 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 30, scale: 0.8 }}
+                        whileHover={{
+                          scale: 1.1,
+                          background: 'rgba(16, 185, 129, 0.1)'
+                        }}
+                        whileTap={{ scale: 0.9 }}
+                        transition={{ type: 'spring', ...springConfig }}
+                      >
+                        <EmeraldChevron isValid={query.trim().length > 2} isLoading={isLoading} />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </NeuralShimmer>
+
+              {/* Mode indicator */}
+              <motion.div
+                className="mt-6 text-[10px] font-mono tracking-[0.2em] text-white/30"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                {ragEnabled ? 'GROUNDED MODE' : 'RAW LLM MODE'} • {documentCount} CHUNKS
               </motion.div>
             </motion.div>
           )}
 
-          {/* SEARCH SECTION - Enabled when documents available */}
-          {documentCount > 0 && (
+          {/* Results State - Collapsed Query */}
+          {results && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="space-y-4"
+              key="results-query"
+              className="fixed top-8 left-8 z-30 flex items-center space-x-4"
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: "spring", ...springConfig }}
             >
-              <div className="flex items-center gap-3">
-                <motion.button
-                  onClick={() => setUseRAG(!useRAG)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all border"
-                  style={{
-                    background: useRAG ? 'rgba(6,182,212,0.2)' : 'rgba(63,63,70,0.5)',
-                    borderColor: useRAG ? 'rgba(6,182,212,0.5)' : 'rgba(63,63,70,0.5)',
-                    color: useRAG ? 'rgba(6,182,212,0.8)' : 'var(--text-secondary)'
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                >
-                  {useRAG ? 'RAG Mode' : 'LLM Only'}
-                </motion.button>
-                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  {useRAG ? 'Using document context' : 'No context'}
-                </span>
-              </div>
-
-              <div className="relative group">
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask anything about your documents..."
-                  className="w-full px-6 py-4 rounded-lg text-zinc-50 focus:outline-none transition-all" style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(63,63,70,0.5)', color: 'var(--text-primary)' }} onFocus={(e) => e.currentTarget.style.borderColor = 'rgba(6,182,212,0.5)'} onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(63,63,70,0.5)'}
-                  disabled={!hasUploaded || isLoading}
-                />
-                <motion.button
-                  onClick={handleSearch}
-                  disabled={!hasUploaded || isLoading || !searchQuery.trim()}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all" style={{ background: `linear-gradient(90deg, var(--accent-info), #06b6d4)` }}
-                >
-                  {isLoading ? <Loader className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
-                </motion.button>
+              <button
+                onClick={clearResults}
+                onMouseEnter={() => setIsHoveringInteractive(true)}
+                onMouseLeave={() => setIsHoveringInteractive(false)}
+                className="p-2 rounded-full transition-colors"
+                style={{ background: 'rgba(255, 255, 255, 0.05)' }}
+              >
+                <X size={16} className="text-white/60" />
+              </button>
+              <div>
+                <div className="text-lg font-semibold text-white/80 tracking-tight">
+                  {currentQuery}
+                </div>
+                {results.processing_time && (
+                  <div className="text-[10px] font-mono text-white/40 tracking-wide">
+                    {results.processing_time}ms • {results.mode?.toUpperCase()}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
+        </AnimatePresence>
+      </div>
 
-          {/* RESULTS SECTION - PRODUCTION: Fixed CSS for large chunks */}
-          {queryResult && (
-            <AnimatePresence>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+      {/* Centered Results Layout */}
+      <AnimatePresence>
+        {results && (
+          <motion.div
+            className="fixed inset-0 flex items-center justify-center z-30 px-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: "spring", ...springConfig }}
+          >
+            <div className="w-full max-w-3xl space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar pr-2">
+              {/* Primary Answer Card */}
+              <GlassFoilCard
+                glowColor="#10b981"
+                isActive={ragEnabled}
+                relevanceScore={results.retrieved_chunks?.[0]?.match}
+                delay={0}
               >
-                {/* RAG ANSWER */}
-                {useRAG && (
-                  <motion.div className="lg:col-span-2 p-6 rounded-xl overflow-hidden border" style={{ background: `linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3))`, borderColor: 'rgba(6,182,212,0.2)' }}>
-                    <div className="flex items-center gap-2 mb-4">
-                      <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--accent-success)' }} />
-                      <h3 className="font-semibold" style={{ color: 'rgba(16,185,129,0.8)' }}>Grounded Answer (RAG)</h3>
-                    </div>
-                    <p className="leading-relaxed text-sm whitespace-normal break-words overflow-x-hidden" style={{ color: 'var(--text-secondary)' }}>{queryResult.rag_answer}</p>
-                  </motion.div>
-                )}
+                <div className="p-6">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <motion.div
+                      className="w-2 h-2 rounded-full bg-emerald-500"
+                      animate={{
+                        boxShadow: [
+                          '0 0 0 rgba(16, 185, 129, 0)',
+                          '0 0 10px rgba(16, 185, 129, 0.6)',
+                          '0 0 0 rgba(16, 185, 129, 0)'
+                        ]
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                    <span className="text-[10px] font-mono tracking-[0.2em] text-emerald-400">
+                      {ragEnabled ? 'GROUNDED' : 'RAW'}
+                    </span>
+                  </div>
+                  <p className="text-white/90 text-sm leading-relaxed font-light whitespace-pre-wrap">
+                    {ragEnabled ? results.rag_answer : results.llm_only}
+                  </p>
+                </div>
+              </GlassFoilCard>
 
-                {/* LLM ANSWER */}
-                {!useRAG && (
-                  <motion.div className="lg:col-span-2 p-6 rounded-xl overflow-hidden border" style={{ background: `linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3))`, borderColor: 'rgba(6,182,212,0.2)' }}>
-                    <div className="flex items-center gap-2 mb-4">
-                      <Zap className="w-5 h-5" style={{ color: 'rgba(6,182,212,0.8)' }} />
-                      <h3 className="font-semibold" style={{ color: 'rgba(6,182,212,0.8)' }}>LLM Only Response</h3>
-                    </div>
-                    <p className="leading-relaxed text-sm whitespace-normal break-words overflow-x-hidden" style={{ color: 'var(--text-secondary)' }}>{queryResult.llm_only}</p>
-                  </motion.div>
-                )}
-
-                {/* SOURCE MATERIALS */}
-                {queryResult.retrieved_chunks && queryResult.retrieved_chunks.length > 0 && (
-                  <motion.div className="p-6 rounded-xl space-y-4 overflow-hidden border" style={{ background: `linear-gradient(135deg, rgba(120,80,0,0.1), rgba(100,60,0,0.1))`, borderColor: 'rgba(180,150,0,0.3)' }}>
-                    <div className="flex items-center gap-2 mb-4">
-                      <TrendingUp className="w-5 h-5" style={{ color: 'rgba(180,150,0,0.8)' }} />
-                      <h3 className="font-semibold" style={{ color: 'rgba(180,150,0,0.8)' }}>Retrieved Sources</h3>
+              {/* Source Chunks */}
+              {ragEnabled && results.retrieved_chunks && results.retrieved_chunks.length > 0 && (
+                <GlassFoilCard glowColor="#10b981" isActive={false} delay={0.1}>
+                  <div className="p-5">
+                    <div className="text-[10px] font-mono tracking-[0.2em] text-white/40 mb-3">
+                      SOURCES
                     </div>
                     <div className="space-y-3">
-                      {queryResult.retrieved_chunks.map((chunk, i) => (
+                      {results.retrieved_chunks.slice(0, 3).map((chunk, i) => (
                         <motion.div
                           key={i}
-                          className="p-3 rounded-lg overflow-hidden border" style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(180,150,0,0.2)' }}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.1 }}
+                          className="p-3 rounded-lg"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            border: '1px solid rgba(255, 255, 255, 0.05)'
+                          }}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 + i * 0.1 }}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1 overflow-hidden">
-                              <p className="text-xs font-mono truncate" style={{ color: 'rgba(180,150,0,0.8)' }}>{chunk.doc}</p>
-                              <p className="text-xs line-clamp-2 mt-1 whitespace-normal break-words" style={{ color: 'var(--text-secondary)' }}>{chunk.text.substring(0, 100)}...</p>
-                            </div>
-                            <motion.span className="px-2 py-1 rounded text-xs font-bold text-white whitespace-nowrap flex-shrink-0" style={{ background: `linear-gradient(90deg, rgba(180,150,0,0.9), rgba(160,120,0,0.9))` }}>
-                              {chunk.match.toFixed(0)}%
-                            </motion.span>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] text-emerald-400 font-mono tracking-wide">
+                              {chunk.doc}
+                            </span>
+                            <span className="text-[10px] text-white/30 font-mono">
+                              {chunk.match}% match
+                            </span>
+                          </div>
+                          <div className="text-xs text-white/50 leading-relaxed line-clamp-2">
+                            {chunk.text.substring(0, 150)}...
                           </div>
                         </motion.div>
                       ))}
                     </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            </AnimatePresence>
-          )}
+                  </div>
+                </GlassFoilCard>
+              )}
 
-          {/* PROCESSING TICKER */}
-          {isLoading && (
+              {/* LLM Comparison (when in RAG mode) */}
+              {ragEnabled && results.llm_only && (
+                <GlassFoilCard glowColor="#6366f1" isActive={false} delay={0.2}>
+                  <div className="p-5">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                      <span className="text-[10px] font-mono tracking-[0.2em] text-indigo-400/70">
+                        RAW LLM
+                      </span>
+                    </div>
+                    <p className="text-white/60 text-xs leading-relaxed line-clamp-4">
+                      {results.llm_only}
+                    </p>
+                  </div>
+                </GlassFoilCard>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Glass Control Dock */}
+      <GlassDock
+        onFileUpload={handleFileUpload}
+        ragEnabled={ragEnabled}
+        onToggleRAG={() => setRagEnabled(!ragEnabled)}
+        documentCount={documentCount}
+        uploadProgress={uploadProgress}
+        isLoading={isLoading}
+        onHoverInteractive={setIsHoveringInteractive}
+      />
+
+      {/* Quick Upload Hint */}
+      <AnimatePresence>
+        {showUploadPrompt && documentCount === 0 && (
+          <motion.div
+            className="fixed bottom-28 left-1/2 transform -translate-x-1/2 z-40"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ type: "spring", ...springConfig, delay: 0.5 }}
+          >
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="fixed bottom-6 left-6 px-4 py-3 rounded-lg text-sm font-mono" style={{ background: 'rgba(0,0,0,0.9)', border: '1px solid rgba(6,182,212,0.3)', color: 'var(--text-secondary)' }}
+              className="px-6 py-3 rounded-xl text-center"
+              style={{
+                background: 'rgba(0, 0, 0, 0.7)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.08)'
+              }}
+              animate={{ y: [0, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             >
-              <span className="inline-block animate-pulse">⚙️ Processing query...</span>
+              <p className="text-white/60 text-xs mb-1">
+                Click the upload button below to add documents
+              </p>
+              <p className="text-[10px] text-white/30 font-mono">
+                Supports PDF, TXT, PNG, JPG with OCR
+              </p>
             </motion.div>
-          )}
-        </div>
-      </main>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
-  );
+  )
 }
