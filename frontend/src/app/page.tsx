@@ -897,18 +897,23 @@ export default function ZenithStealth() {
       <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
         <AnimatePresence mode="wait">
           {/* Upload Prompt State */}
-          {!results && showUploadPrompt && documentCount === 0 && (
+          {/* Upload Prompt */}
+          {!results && documentCount === 0 && (
             <motion.div
               key="upload-prompt"
-              className="text-center mb-12"
+              className="text-center absolute top-1/3"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -30 }}
               transition={{ type: "spring", ...springConfig }}
             >
-              <p className="text-white/40 text-sm font-mono tracking-wide">
-                Upload documents for grounded answers
+              <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white/90 mb-4">
+                Upload documents first
+              </h1>
+              <p className="text-white/40 text-sm font-mono tracking-wide mb-6">
+                PDF • TXT • MD • CSV • JSON • XML • HTML • Images
               </p>
+              <BlinkingCursor />
             </motion.div>
           )}
 
