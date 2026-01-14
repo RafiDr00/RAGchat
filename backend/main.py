@@ -130,10 +130,18 @@ async def ingest(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="File too large (max 20MB)")
     
     try:
-        # Sanitize filename - prevent path traversal
-        safe_filename = os.path.basename(file.filename) if file.filename else f"upload_{int(time.time())}{ext}"
+        # Sanitize filename - remove invalid characters for Windows
+        import re
+        raw_filename = os.path.basename(file.filename) if file.filename else f"upload_{int(time.time())}{ext}"
+        # Remove invalid Windows filename characters: < > : " / \ | ? *
+        safe_filename = re.sub(r'[<>:"/\\|?*]', '_', raw_filename)
+        # Also remove any control characters
+        safe_filename = re.sub(r'[\x00-\x1f]', '', safe_filename)
+        # Ensure not empty and no path traversal
         if not safe_filename or ".." in safe_filename:
-            raise ValueError("Invalid filename")
+            safe_filename = f"upload_{int(time.time())}{ext}"
+        
+        logger.info(f"Uploading file: {safe_filename}")
         
         # Save file to uploads directory
         path = UPLOAD_DIR / safe_filename
