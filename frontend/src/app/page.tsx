@@ -893,190 +893,127 @@ export default function ZenithStealth() {
       {/* Volumetric Space Background */}
       <VolumetricSpace speed={0.8} loading={isLoading} />
 
-      {/* Neural Input Interface */}
+      {/* Main Interface */}
       <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 5 }}>
         <AnimatePresence mode="wait">
           {!results && (
             <motion.div
-              className="flex flex-col items-center justify-center w-full max-w-6xl px-8"
+              className="flex flex-col items-center justify-center w-full max-w-4xl px-8"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}
             >
-              {/* Upload Prompt - Glassy 3D Style */}
+              {/* Upload Prompt - Clean */}
               {documentCount === 0 && (
                 <motion.div
-                  className="text-center mb-20"
-                  initial={{ opacity: 0, y: -30 }}
+                  className="text-center mb-24"
+                  initial={{ opacity: 0, y: -12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 25 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
                 >
                   <h1
-                    className="text-6xl md:text-8xl font-black tracking-tighter mb-6"
+                    className="text-5xl md:text-7xl font-semibold tracking-tight mb-8"
                     style={{
                       color: '#ffffff',
-                      textShadow: `
-                        0 0 40px rgba(16, 185, 129, 0.3),
-                        0 0 80px rgba(16, 185, 129, 0.2),
-                        0 4px 8px rgba(0, 0, 0, 0.4),
-                        0 8px 16px rgba(0, 0, 0, 0.3),
-                        0 16px 32px rgba(0, 0, 0, 0.2),
-                        2px 2px 0px rgba(16, 185, 129, 0.1),
-                        4px 4px 0px rgba(0, 0, 0, 0.15)
-                      `,
-                      background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                      filter: 'drop-shadow(0 4px 12px rgba(16, 185, 129, 0.2))'
+                      textShadow: '0 2px 12px rgba(0, 0, 0, 0.6)'
                     }}
                   >
                     Upload documents
                   </h1>
-                  <motion.div
-                    className="inline-block px-8 py-3 rounded-2xl"
+                  <p
+                    className="text-sm font-mono tracking-wider"
                     style={{
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      backdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      boxShadow: `
-                        0 8px 32px rgba(0, 0, 0, 0.3),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.1)
-                      `
+                      color: 'rgba(255, 255, 255, 0.4)',
+                      letterSpacing: '0.1em'
                     }}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 }}
                   >
-                    <p
-                      className="text-xs font-mono tracking-[0.3em]"
-                      style={{
-                        color: 'rgba(16, 185, 129, 0.8)',
-                        textShadow: '0 0 20px rgba(16, 185, 129, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3)'
-                      }}
-                    >
-                      PDF • TXT • MD • CSV • JSON • XML • HTML • IMAGES
-                    </p>
-                  </motion.div>
+                    PDF • TXT • MD • CSV • JSON • XML • HTML • IMAGES
+                  </p>
                 </motion.div>
               )}
 
-              {/* Query Input - Glassy 3D */}
+              {/* Query Input - Minimal */}
               <motion.div
-                className="relative text-center w-full max-w-5xl"
-                initial={{ opacity: 0, y: 20 }}
+                className="relative text-center w-full max-w-4xl"
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 200, damping: 25, delay: documentCount === 0 ? 0.3 : 0 }}
+                transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1], delay: documentCount === 0 ? 0.2 : 0 }}
               >
-                {/* Glassy backdrop */}
+                {/* Subtle backdrop */}
                 <div
-                  className="absolute inset-0 -m-8 rounded-3xl"
+                  className="absolute inset-0 -m-6 rounded-2xl"
                   style={{
                     background: 'rgba(255, 255, 255, 0.02)',
-                    backdropFilter: 'blur(40px)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    boxShadow: `
-                      0 20px 60px rgba(0, 0, 0, 0.4),
-                      0 40px 100px rgba(0, 0, 0, 0.3),
-                      inset 0 1px 0 rgba(255, 255, 255, 0.05)
-                    `,
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.6)',
                     zIndex: -1
                   }}
                 />
 
-                <NeuralShimmer active={isLoading}>
-                  <div className="relative flex items-center justify-center py-6">
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      onFocus={() => setIsHoveringInteractive(true)}
-                      onBlur={() => setIsHoveringInteractive(false)}
-                      placeholder={isLoading ? "Processing..." : "Ask anything..."}
-                      disabled={isLoading}
-                      className="w-full bg-transparent border-none outline-none text-5xl md:text-7xl font-black tracking-tight text-center pr-20"
-                      style={{
-                        caretColor: '#10b981',
-                        color: '#ffffff',
-                        textShadow: `
-                          0 0 40px rgba(16, 185, 129, 0.4),
-                          0 0 80px rgba(16, 185, 129, 0.2),
-                          0 4px 12px rgba(0, 0, 0, 0.5),
-                          0 8px 24px rgba(0, 0, 0, 0.4),
-                          0 16px 48px rgba(0, 0, 0, 0.3),
-                          2px 2px 0px rgba(16, 185, 129, 0.15),
-                          4px 4px 0px rgba(0, 0, 0, 0.2)
-                        `,
-                        WebkitTextStroke: '0.5px rgba(255, 255, 255, 0.1)'
-                      }}
-                    />
+                <div className="relative flex items-center justify-center py-8 px-4">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    onFocus={() => setIsHoveringInteractive(true)}
+                    onBlur={() => setIsHoveringInteractive(false)}
+                    placeholder={isLoading ? "Processing..." : "Ask anything..."}
+                    disabled={isLoading}
+                    className="w-full bg-transparent border-none outline-none text-4xl md:text-6xl font-semibold tracking-tight text-center pr-16"
+                    style={{
+                      caretColor: 'rgba(255, 255, 255, 0.6)',
+                      color: '#ffffff',
+                      textShadow: '0 2px 12px rgba(0, 0, 0, 0.6)'
+                    }}
+                  />
 
-                    {/* Chevron Trigger */}
-                    <AnimatePresence>
-                      {query.length > 0 && (
-                        <motion.button
-                          onClick={handleSubmit}
-                          onMouseEnter={() => setIsHoveringInteractive(true)}
-                          onMouseLeave={() => setIsHoveringInteractive(false)}
-                          className="absolute right-0 p-4 rounded-2xl"
-                          style={{
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            backdropFilter: 'blur(20px)',
-                            border: '1px solid rgba(16, 185, 129, 0.2)',
-                            boxShadow: `
-                              0 0 20px rgba(16, 185, 129, 0.3),
-                              0 8px 24px rgba(0, 0, 0, 0.4),
-                              inset 0 1px 0 rgba(255, 255, 255, 0.1)
-                            `
-                          }}
-                          initial={{ opacity: 0, x: 30, scale: 0.8 }}
-                          animate={{ opacity: 1, x: 0, scale: 1 }}
-                          exit={{ opacity: 0, x: 30, scale: 0.8 }}
-                          whileHover={{
-                            scale: 1.1,
-                            background: 'rgba(16, 185, 129, 0.15)',
-                            boxShadow: `
-                              0 0 30px rgba(16, 185, 129, 0.5),
-                              0 12px 32px rgba(0, 0, 0, 0.5)
-                            `
-                          }}
-                          whileTap={{ scale: 0.95 }}
-                          transition={{ type: 'spring', ...springConfig }}
-                        >
-                          <EmeraldChevron isValid={query.trim().length > 2} isLoading={isLoading} />
-                        </motion.button>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </NeuralShimmer>
+                  {/* Submit Button */}
+                  <AnimatePresence>
+                    {query.length > 0 && (
+                      <motion.button
+                        onClick={handleSubmit}
+                        onMouseEnter={() => setIsHoveringInteractive(true)}
+                        onMouseLeave={() => setIsHoveringInteractive(false)}
+                        className="absolute right-0 p-3 rounded-lg"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.6)'
+                        }}
+                        initial={{ opacity: 0, x: 20, scale: 0.9 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 20, scale: 0.9 }}
+                        whileHover={{
+                          scale: 1.02,
+                          background: 'rgba(255, 255, 255, 0.12)'
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+                      >
+                        <ChevronRight
+                          size={20}
+                          className={query.trim().length > 2 ? "text-white/90" : "text-white/40"}
+                        />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
 
-                {/* Mode indicator - Glassy Badge */}
+                {/* Mode indicator */}
                 <motion.div
-                  className="mt-8 inline-block px-6 py-2 rounded-full"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: `
-                      0 4px 16px rgba(0, 0, 0, 0.3),
-                      inset 0 1px 0 rgba(255, 255, 255, 0.05)
-                    `
-                  }}
+                  className="mt-6"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
+                  transition={{ delay: 0.3 }}
                 >
                   <span
-                    className="text-[10px] font-mono tracking-[0.25em]"
+                    className="text-[10px] font-mono tracking-wider"
                     style={{
-                      color: ragEnabled ? 'rgba(16, 185, 129, 0.9)' : 'rgba(255, 255, 255, 0.5)',
-                      textShadow: ragEnabled
-                        ? '0 0 15px rgba(16, 185, 129, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)'
-                        : '0 2px 4px rgba(0, 0, 0, 0.3)'
+                      color: 'rgba(255, 255, 255, 0.35)'
                     }}
                   >
                     {ragEnabled ? 'GROUNDED MODE' : 'RAW LLM MODE'} • {documentCount} CHUNKS
