@@ -807,6 +807,17 @@ export default function ZenithStealth() {
     return () => clearInterval(interval)
   }, [showUploadPrompt])
 
+  // Escape key to go back
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && results) {
+        clearResults()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [results])
+
   const handleFileUpload = async (file: File) => {
     setUploadProgress(0)
 
@@ -1027,7 +1038,7 @@ export default function ZenithStealth() {
           {results && (
             <motion.div
               key="results-query"
-              className="fixed top-8 left-8 z-30 flex items-center space-x-4"
+              className="fixed top-8 left-8 z-50 flex items-center space-x-4"
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ type: "spring", ...springConfig }}
@@ -1036,10 +1047,14 @@ export default function ZenithStealth() {
                 onClick={clearResults}
                 onMouseEnter={() => setIsHoveringInteractive(true)}
                 onMouseLeave={() => setIsHoveringInteractive(false)}
-                className="p-2 rounded-full transition-colors"
-                style={{ background: 'rgba(255, 255, 255, 0.05)' }}
+                className="p-3 rounded-lg transition-all hover:scale-105"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}
+                title="Go back (Escape)"
               >
-                <X size={16} className="text-white/60" />
+                <X size={20} className="text-white/80" />
               </button>
               <div>
                 <div className="text-lg font-semibold text-white/80 tracking-tight">

@@ -55,24 +55,30 @@ class LLMService:
         
         context = "\n\n".join(context_parts)
         
-        system_prompt = """You are a precise knowledge assistant. Your task is to synthesize information from the provided document chunks into a well-organized answer.
+        system_prompt = """You are a document-grounded assistant. You MUST answer ONLY using the provided context.
 
-FORMATTING RULES:
-- Start with a brief, direct answer
-- Organize information with bullet points where appropriate  
-- Cite sources using [Source X] notation when referencing specific chunks
-- If chunks contradict each other, note the discrepancy
-- If information is incomplete, acknowledge what's missing
-- Use clear, professional language - make it feel synthesized, not copy-pasted
+CRITICAL RULES:
+1. Answer ONLY from the provided context - do NOT use your training knowledge
+2. If the context doesn't contain the answer, say: "The uploaded documents don't contain information about this."
+3. Be concise and direct - no fluff
+4. Quote relevant parts when helpful
+5. Cite sources as [Source X] where X is the source number
 
-DO NOT just regurgitate chunks. Synthesize them into a coherent response."""
+OUTPUT FORMAT:
+- Start with a direct answer (1-2 sentences)
+- Add bullet points for details if needed
+- End with source citations if you referenced specific chunks
 
-        user_prompt = f"""Context from documents:
+If the context is insufficient or irrelevant to the question, explicitly state that."""
+
+        user_prompt = f"""CONTEXT FROM UPLOADED DOCUMENTS:
+---
 {context}
+---
 
-Question: {question}
+QUESTION: {question}
 
-Provide a well-organized answer that synthesizes the information above. Use bullet points for clarity when listing multiple items."""
+Answer using ONLY the context above. If the context doesn't contain relevant information, say so clearly."""
 
         # Try OpenAI first
         if self.openai_client:
