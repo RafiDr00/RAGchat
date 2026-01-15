@@ -168,7 +168,9 @@ async def ingest(file: UploadFile = File(...)):
         }
         
     except Exception as e:
+        import traceback
         logger.error(f"Upload failed: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
