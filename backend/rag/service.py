@@ -5,6 +5,8 @@ from .document_processor import process_document, process_document_bytes, get_su
 from .llm_service import LLMService
 import logging
 import threading
+import re
+import numpy as np
 from typing import List, Dict, Tuple, Optional
 
 logger = logging.getLogger(__name__)
@@ -136,28 +138,69 @@ class RAGService:
             logger.error(f"Failed to ingest {filename}: {e}")
             raise
 
-    def _create_chunks(self, text: str, doc_name: str, chunk_size: int = 512, overlap: int = 50) -> List[Dict]:
-        """Create text chunks with embeddings"""
+    def _create_chunks(self, text: str, doc_name: str, chunk_size: int = 500, overlap: int = 100) -> List[Dict]:
+        """
+        Create semantic text chunks.
+        Chunk size: 400-600 characters (~100-150 words)
+        Overlap: 50-100 characters
+        Preserves semantic boundaries (paragraphs)
+        """
         chunks = []
         
-        for i in range(0, len(text), chunk_size - overlap):
-            chunk_text = text[i:i + chunk_size]
-            
-            # Skip very short chunks
-            if len(chunk_text.strip()) < 20:
+        # Split by paragraph first to preserve semantic boundaries
+        paragraphs = re.split(r'\n\s*\n', text)
+        
+        current_chunk = ""
+        chunk_idx = 0
+        
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
                 continue
-            
-            # Pre-compute embedding outside lock
-            chunk_embedding = self.embedder.embed(chunk_text)
-            
+                
+            # If paragraph is too large, split by sentences or just slice as fallback
+            if len(para) > chunk_size:
+                # Direct split for very large blocks
+                for i in range(0, len(para), chunk_size - overlap):
+                    chunk_text = para[i:i + chunk_size]
+                    if len(chunk_text.strip()) > 50:
+                        chunks.append({
+                            "doc": doc_name,
+                            "chunk_index": chunk_idx,
+                            "text": chunk_text,
+                            "embedding": self.embedder.embed(chunk_text),
+                            "metadata": {"doc_id": doc_name, "chunk_index": chunk_idx}
+                        })
+                        chunk_idx += 1
+            else:
+                # Check if adding this paragraph exceeds chunk size
+                if len(current_chunk) + len(para) > chunk_size:
+                    # Save current chunk and start new one
+                    if current_chunk.strip():
+                        chunks.append({
+                            "doc": doc_name,
+                            "chunk_index": chunk_idx,
+                            "text": current_chunk.strip(),
+                            "embedding": self.embedder.embed(current_chunk),
+                            "metadata": {"doc_id": doc_name, "chunk_index": chunk_idx}
+                        })
+                        chunk_idx += 1
+                    # Start new chunk with overlap from previous if possible
+                    overlap_text = current_chunk[-overlap:] if len(current_chunk) > overlap else ""
+                    current_chunk = overlap_text + para + "\n\n"
+                else:
+                    current_chunk += para + "\n\n"
+                    
+        # Add remaining text
+        if current_chunk.strip():
             chunks.append({
                 "doc": doc_name,
-                "text": chunk_text,
-                "embedding": chunk_embedding,
-                "start_idx": i,
-                "end_idx": min(i + chunk_size, len(text))
+                "chunk_index": chunk_idx,
+                "text": current_chunk.strip(),
+                "embedding": self.embedder.embed(current_chunk),
+                "metadata": {"doc_id": doc_name, "chunk_index": chunk_idx}
             })
-        
+            
         return chunks
 
     def query(self, question: str, use_rag: bool = True) -> Tuple[str, str, List[Dict]]:
@@ -166,55 +209,40 @@ class RAGService:
         
         Args:
             question: User's question
-            use_rag: Whether to use RAG or only LLM
-            
-        Returns:
-            Tuple of (rag_answer, llm_answer, retrieved_chunks)
+        Academic RAG Query Pipeline:
+        1. Pre-process query (search-optimized)
+        2. Retrieve (Threshold + Top-K)
+        3. Grounded Answer Generation
         """
         try:
             if not question or not question.strip():
-                return (
-                    "Please provide a question to search.",
-                    "I need a question to assist you.",
-                    []
-                )
+                return ("Please ask a valid question.", "", [])
             
-            # Retrieve relevant chunks
-            retrieved = hybrid_retrieve(question, self.chunks, self.embedder, top_k=5)
+            # Step 1: Pre-process query for better retrieval
+            search_query = self.llm_service.preprocess_query(question)
             
-            # Format chunks for response with match scores
-            chunk_summaries = []
-            for idx, chunk in enumerate(retrieved):
-                # Calculate approximate relevance score (0-100)
-                query_embedding = self.embedder.embed(question)
-                chunk_embedding = chunk.get("embedding")
-                if chunk_embedding is not None:
-                    import numpy as np
-                    similarity = float(np.dot(query_embedding, chunk_embedding))
-                    match_score = min(100, max(0, int(similarity * 100)))
-                else:
-                    match_score = 80 - (idx * 10)  # Fallback: decreasing score
-                
-                chunk_summaries.append({
-                    "doc": chunk["doc"],
-                    "text": chunk["text"][:300],
-                    "preview": chunk["text"][:100] + "...",
-                    "match": match_score
-                })
+            # Step 2: Retrieve with strict threshold and Top-K=4
+            retrieved = hybrid_retrieve(search_query, self.chunks, self.embedder, top_k=4, threshold=0.25)
             
-            # Generate RAG-grounded answer
-            if retrieved and use_rag:
-                rag_answer = self.llm_service.generate_rag_answer(question, retrieved)
-            elif retrieved:
-                # Return raw chunks if not using LLM for RAG
-                rag_answer = "\n\n".join([c["text"][:250] for c in retrieved[:3]])
-            else:
-                rag_answer = "No relevant information found in the uploaded documents."
+            # Step 3: Generate strictly grounded answer
+            rag_answer = self.llm_service.generate_rag_answer(question, retrieved)
             
-            # Generate LLM-only answer
+            # Step 4: Generate LLM baseline (for comparison)
             llm_answer = self.llm_service.generate_llm_only_answer(question)
             
-            return rag_answer, llm_answer, chunk_summaries
+            # Format chunks with actual scores for the UI
+            query_vec = self.embedder.embed(search_query)
+            chunk_summaries = []
+            for chunk in retrieved:
+                sim = float(np.dot(query_vec, chunk["embedding"]))
+                chunk_summaries.append({
+                    "doc": chunk["doc"],
+                    "chunk_index": chunk.get("chunk_index", 0),
+                    "text": chunk["text"],
+                    "match_score": int(sim * 100)
+                })
+                
+            return (rag_answer, llm_answer, chunk_summaries)
         
         except Exception as e:
             logger.error(f"Query failed: {e}")

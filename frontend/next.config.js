@@ -2,16 +2,10 @@
 const nextConfig = {
   output: 'standalone',
   experimental: {
-    optimizePackageImports: ['framer-motion', 'lucide-react']
-  },
-  // API proxy to backend
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:8001/:path*',
-      },
-    ]
+    optimizePackageImports: ['framer-motion', 'lucide-react'],
+    serverActions: {
+      bodySizeLimit: '20mb',
+    },
   },
   // Headers for better caching
   async headers() {

@@ -28,81 +28,99 @@ class LLMService:
         
         # Initialize OpenAI if available and configured
         openai_key = os.getenv("OPENAI_API_KEY", "")
-        if OPENAI_AVAILABLE and openai_key and not openai_key.startswith("sk_test"):
+        if openai_key == "your_openai_api_key_here":
+            logger.warning("OPENAI_API_KEY is still using the placeholder value. OpenAI features will be disabled.")
+            openai_key = ""
+            
+        if OPENAI_AVAILABLE and openai_key and not openai_key.startswith("sk_test_placeholder"):
             try:
                 self.openai_client = OpenAI(api_key=openai_key)
                 logger.info(f"OpenAI initialized with model: {self.openai_model}")
             except Exception as e:
                 logger.error(f"OpenAI initialization failed: {e}")
     
+    def preprocess_query(self, question: str) -> str:
+        """Rewrite user question into search-optimized fact-seeking query"""
+        if not self.openai_client:
+            return question # Fallback to original
+            
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=self.openai_model,
+                messages=[
+                    {"role": "system", "content": "Rewrite the user question into a search-optimized fact-seeking query. Strip fluff and conversational ambiguity. Output ONLY the rewritten query."},
+                    {"role": "user", "content": question}
+                ],
+                max_tokens=50,
+                temperature=0.1
+            )
+            rewritten = response.choices[0].message.content.strip()
+            logger.info(f"Query Pre-processed: '{question}' -> '{rewritten}'")
+            return rewritten
+        except Exception as e:
+            logger.error(f"Query pre-processing failed: {e}")
+            return question
+
     def generate_rag_answer(
         self, 
         question: str, 
         context_chunks: List[Dict],
-        max_tokens: int = 500
+        max_tokens: int = 400
     ) -> str:
-        """Generate RAG-grounded answer using retrieved context"""
+        """
+        Generate strict RAG-grounded answer.
+        Implements context assembly with delimiters and metadata.
+        """
+        # Academic RAG refusal check: must have at least 1 strong chunk
+        if not context_chunks or len(context_chunks) < 1:
+            return "The provided documents do not contain sufficient information to answer this question."
         
-        if not context_chunks:
-            return "No relevant information found in the uploaded documents."
-        
-        # Build context from retrieved chunks
+        # Context Assembly (Strictly Concatenated with Delimiters)
         context_parts = []
-        for i, chunk in enumerate(context_chunks[:5], 1):
-            source = chunk.get("doc", "Unknown")
-            text = chunk.get("text", "")[:500]
-            context_parts.append(f"[Source {i}: {source}]\n{text}")
+        for i, chunk in enumerate(context_chunks):
+            doc_id = chunk.get("doc", "unknown")
+            chunk_idx = chunk.get("chunk_index", "0")
+            text = chunk.get("text", "").strip()
+            
+            context_parts.append(f"--- CHUNK {i+1} [DOC: {doc_id} | INDEX: {chunk_idx}] ---\n{text}")
         
-        context = "\n\n".join(context_parts)
+        context_text = "\n\n".join(context_parts)
         
-        system_prompt = """You are a document-grounded assistant. You MUST answer ONLY using the provided context.
+        system_prompt = """You are RAGchat, a professional RAG auditor. Answer the user's question using ONLY the provided context.
 
-CRITICAL RULES:
-1. Answer ONLY from the provided context - do NOT use your training knowledge
-2. If the context doesn't contain the answer, say: "The uploaded documents don't contain information about this."
-3. Be concise and direct - no fluff
-4. Quote relevant parts when helpful
-5. Cite sources as [Source X] where X is the source number
+STRICT GROUNDING RULES:
+1. **Context-Only**: Answer using ONLY the provided documents. No general knowledge. No speculation.
+2. **Refusal**: If the context does not contain the answer, say EXACTLY: "The provided documents do not contain this information." 
+3. **Citations**: Cite references as [DOC_ID:CHUNK_INDEX] for every factual claim.
+4. **Style**: Be precise, minimal, and factual. No filler. No vibes.
+5. **No Hallucinations**: You are forbidden from answering outside the text blocks.
 
-OUTPUT FORMAT:
-- Start with a direct answer (1-2 sentences)
-- Add bullet points for details if needed
-- End with source citations if you referenced specific chunks
+If there are conflicting facts, mention both and their respective sources."""
 
-If the context is insufficient or irrelevant to the question, explicitly state that."""
+        user_content = f"CONTEXT BLOCKS:\n\n{context_text}\n\nUSER QUESTION: {question}"
 
-        user_prompt = f"""CONTEXT FROM UPLOADED DOCUMENTS:
----
-{context}
----
-
-QUESTION: {question}
-
-Answer using ONLY the context above. If the context doesn't contain relevant information, say so clearly."""
-
-        # Try OpenAI first
+        # Try OpenAI (Deterministic 0.1 temperature)
         if self.openai_client:
             try:
                 response = self.openai_client.chat.completions.create(
                     model=self.openai_model,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
+                        {"role": "user", "content": user_content}
                     ],
                     max_tokens=max_tokens,
-                    temperature=0.3
+                    temperature=0.1
                 )
                 return response.choices[0].message.content.strip()
             except Exception as e:
-                logger.error(f"OpenAI RAG generation failed: {e}")
+                logger.error(f"RAG generation error: {e}")
         
-        # Try Ollama
-        ollama_response = self._try_ollama(f"{system_prompt}\n\n{user_prompt}")
+        # Fallback to local Ollama with same strict prompt
+        ollama_response = self._try_ollama(f"{system_prompt}\n\n{user_content}")
         if ollama_response:
             return ollama_response
-        
-        # Fallback: Return context summary
-        return self._format_context_as_answer(context_chunks)
+            
+        return "The provided documents do not contain sufficient information to answer this question."
     
     def generate_llm_only_answer(self, question: str, max_tokens: int = 500) -> str:
         """Generate answer using only LLM knowledge (no RAG)"""

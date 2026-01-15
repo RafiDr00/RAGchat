@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from pathlib import Path
@@ -12,9 +12,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent / "data" / "documents"
-UPLOAD_DIR = Path(__file__).parent / "data" / "uploads"
+# Use temp directory for uploads to avoid OneDrive sync conflicts
+import tempfile
+UPLOAD_DIR = Path(tempfile.gettempdir()) / "ragchat_uploads"
 DATA_DIR.mkdir(exist_ok=True, parents=True)
 UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
+logger.info(f"Upload directory: {UPLOAD_DIR}")
 
 app = FastAPI(
     title="RAGchat",
@@ -103,11 +106,16 @@ async def upload(file: UploadFile = File(...)):
 
 
 @app.post("/ingest")
-async def ingest(file: UploadFile = File(...)):
+async def ingest(request: Request, file: UploadFile = File(...)):
     """
     Ingest document - Fortune 500 spec with multi-format support.
     Supports: PDF, TXT, Images (with OCR)
     """
+    headers = dict(request.headers)
+    logger.info(f"=== INGEST REQUEST RECEIVED ===")
+    logger.info(f"Headers: {headers}")
+    logger.info(f"Filename: {file.filename}, Content-Type: {file.content_type}")
+    
     if rag_service is None:
         raise HTTPException(status_code=503, detail="Service not initialized")
     
@@ -132,24 +140,28 @@ async def ingest(file: UploadFile = File(...)):
     try:
         # Sanitize filename - remove invalid characters for Windows
         import re
-        raw_filename = os.path.basename(file.filename) if file.filename else f"upload_{int(time.time())}{ext}"
-        # Remove invalid Windows filename characters: < > : " / \ | ? *
-        safe_filename = re.sub(r'[<>:"/\\|?*]', '_', raw_filename)
-        # Also remove any control characters
-        safe_filename = re.sub(r'[\x00-\x1f]', '', safe_filename)
-        # Ensure not empty and no path traversal
-        if not safe_filename or ".." in safe_filename:
-            safe_filename = f"upload_{int(time.time())}{ext}"
-        
-        logger.info(f"Uploading file: {safe_filename}")
-        
-        # Save file to uploads directory
-        path = UPLOAD_DIR / safe_filename
-        with open(path, "wb") as f:
-            f.write(content)
-        
-        # Track timing for Fortune 500 latency reporting
+        import uuid
+        # Prepare for ingestion (always proceed from memory)
+        raw_filename = os.path.basename(file.filename) if file.filename else f"upload_{int(time.time())}.{ext}"
         start_time = time.time()
+        
+        # Try to save to disk for persistence, but don't let it block ingestion if it fails
+        try:
+            # Use GUID for safe internal storage
+            import uuid
+            internal_filename = f"{uuid.uuid4()}{Path(raw_filename).suffix.lower() or '.tmp'}"
+            save_path = (UPLOAD_DIR / internal_filename).resolve()
+            
+            # Ensure dir exists one last time
+            UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
+            
+            with open(str(save_path), "wb") as f:
+                f.write(content)
+            logger.info(f"File saved successfully to: {save_path}")
+        except Exception as disk_err:
+            logger.warning(f"Failed to persist file to disk: {disk_err}. Proceeding with in-memory ingestion.")
+        
+        safe_filename = raw_filename # Keep original name for RAG metadata
         
         # Ingest using the new bytes-based API
         result = rag_service.ingest_bytes(content, safe_filename, content_type)
