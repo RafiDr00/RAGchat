@@ -1,9 +1,13 @@
 import os
 import re
-import logging
 import io
+import socket
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Optional, Tuple, List
+import requests
+from bs4 import BeautifulSoup
+from loguru import logger
 
 # Core dependencies
 import PyPDF2
@@ -17,17 +21,47 @@ try:
 except ImportError:
     DOCX_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+def is_safe_url(url: str) -> bool:
+    """
+    Brutal SSRF Protection: Deny private, loopback, and reserved IP ranges.
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+            
+        # Resolve IP
+        ip_address = socket.gethostbyname(hostname)
+        ip_parts = list(map(int, ip_address.split('.')))
+        
+        # Reserved/Private ranges
+        if (
+            ip_parts[0] == 10 or # 10.0.0.0/8
+            (ip_parts[0] == 172 and 16 <= ip_parts[1] <= 31) or # 172.16.0.0/12
+            (ip_parts[0] == 192 and ip_parts[1] == 168) or # 192.168.0.0/16
+            ip_parts[0] == 127 or # 127.0.0.0/8
+            ip_parts[0] == 169 and ip_parts[1] == 254 or # 169.254.0.0/16 (AWS/Metadata)
+            ip_parts[0] == 0 or # 0.0.0.0
+            ip_parts[0] >= 224 # Multicast/Reserved
+        ):
+            logger.error(f"SSRF Attempt Blocked: {url} resolves to private IP {ip_address}")
+            return False
+            
+        return True
+    except Exception as e:
+        logger.error(f"URL Safety Check Failed for {url}: {e}")
+        return False
 
 def normalize_whitespace(text: str) -> str:
     """Normalize whitespace: separate paragraphs by double newlines, clean within."""
     if not text:
         return ""
-    # Standardize line endings
     text = text.replace('\r\n', '\n').replace('\r', '\n')
-    # Collapse multiple spaces
     text = re.sub(r'[ \t]+', ' ', text)
-    # Ensure paragraphs are clearly separated but not overly spaced
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
@@ -43,7 +77,6 @@ def extract_from_pdf(content: bytes) -> str:
         
         extracted = "\n\n".join(text_content)
         
-        # If extraction is very poor, trigger OCR
         if len(extracted.strip()) < 100:
             logger.info("PDF extraction low yield, attempting OCR fallback...")
             images = convert_from_bytes(content, dpi=200)
@@ -74,9 +107,7 @@ def extract_from_text(content: bytes) -> str:
     """Extract text from TXT/HTML/XML."""
     try:
         raw_text = content.decode('utf-8', errors='replace')
-        # Simple HTML tag stripping if it looks like HTML
         if "<body" in raw_text.lower() or "<html" in raw_text.lower():
-            from bs4 import BeautifulSoup
             soup = BeautifulSoup(raw_text, "lxml")
             raw_text = soup.get_text(separator='\n\n')
         return normalize_whitespace(raw_text)
@@ -85,10 +116,6 @@ def extract_from_text(content: bytes) -> str:
         return ""
 
 def process_file_bytes(content: bytes, filename: str) -> Tuple[str, str]:
-    """
-    Unified entry point for document text extraction.
-    Returns (extracted_text, doc_type).
-    """
     ext = Path(filename).suffix.lower()
     text = ""
     doc_type = "unknown"
@@ -103,7 +130,6 @@ def process_file_bytes(content: bytes, filename: str) -> Tuple[str, str]:
         text = extract_from_text(content)
         doc_type = "text"
     elif ext in [".png", ".jpg", ".jpeg", ".tiff"]:
-        # Direct Image OCR
         image = Image.open(io.BytesIO(content))
         text = normalize_whitespace(pytesseract.image_to_string(image))
         doc_type = "image"
@@ -112,3 +138,30 @@ def process_file_bytes(content: bytes, filename: str) -> Tuple[str, str]:
         logger.warning(f"No text extracted from {filename}")
         
     return text, doc_type
+
+def extract_from_url(url: str) -> str:
+    """Fetch content from URL with safety checks and extract text."""
+    try:
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+            
+        if not is_safe_url(url):
+            return "Error: Restricted or invalid URL destination."
+            
+        logger.info(f"Safe fetch initiated: {url}")
+        response = requests.get(url, timeout=10, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) RAGchat-Auditor/2.1'
+        })
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, "lxml")
+        for script in soup(["script", "style", "nav", "footer", "header"]):
+            script.decompose()
+            
+        text = soup.get_text(separator='\n\n')
+        return normalize_whitespace(text)
+    except Exception as e:
+        logger.error(f"URL extraction error for {url}: {e}")
+        return ""
+
+

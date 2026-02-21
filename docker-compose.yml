@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: ragchat-engine
+    ports:
+      - "8001:8001"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALLOWED_ORIGINS=http://localhost:3000
+    volumes:
+      - ./backend/qdrant_db:/app/qdrant_db
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: ragchat-ui
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+    restart: unless-stopped

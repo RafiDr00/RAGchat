@@ -1,105 +1,156 @@
-import logging
-import threading
-from typing import List, Dict, Tuple
+import os
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, VectorParams, PointStruct
+from loguru import logger
 import numpy as np
 
-from ..ingestion.processor import process_file_bytes
-from ..chunking.splitter import semantic_chunking
-from ..embeddings.embedder import Embedder
-from ..retrieval.hybrid import hybrid_retrieval
-from ..generation.grounded_gen import GroundedGenerator
-
-logger = logging.getLogger(__name__)
+from rag_core.embedding.embedder import Embedder
+from rag_core.generation.grounded_gen import GroundedGenerator
+from rag_core.ingestion.processor import process_file_bytes, extract_from_url, semantic_chunking
+from config import settings
 
 class RAGManager:
-    """Orchestrates the modular RAG pipeline without global mutable state."""
+    """
+    Orchestration layer for the RAG pipeline.
+    Handles persistence, retrieval, and state management via Qdrant.
+    """
     
-    def __init__(self):
+    def __init__(self, collection_name: str = None):
         self.embedder = Embedder()
         self.generator = GroundedGenerator()
-        self.chunks: List[Dict] = []
-        self.lock = threading.Lock()
-        logger.info("RAGManager initialized and RAG Core modules loaded.")
+        self.collection_name = collection_name or settings.COLLECTION_NAME
+        
+        # Ensure database directory exists
+        if not os.path.exists(settings.QDRANT_PATH):
+            os.makedirs(settings.QDRANT_PATH)
+            
+        self.client = QdrantClient(path=settings.QDRANT_PATH)
+        self._ensure_collection()
+        logger.info(f"RAGManager: Vector DB persistence active at {settings.QDRANT_PATH}")
+
+    def _ensure_collection(self):
+        """Idempotent collection creation."""
+        collections = self.client.get_collections().collections
+        exists = any(c.name == self.collection_name for c in collections)
+        
+        if not exists:
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(
+                    size=settings.VECTOR_SIZE, 
+                    distance=Distance.COSINE
+                )
+            )
+            logger.info(f"RAGManager: Created collection '{self.collection_name}'")
 
     def add_document(self, content: bytes, filename: str) -> bool:
-        """Process, chunk, and embed a new document."""
+        """Process and index a document into the vector space."""
         try:
-            # 1. Extraction & Normalization
             text, doc_type = process_file_bytes(content, filename)
             if not text:
                 return False
                 
-            # 2. Semantic Chunking
-            raw_chunks = semantic_chunking(text, filename)
+            chunks = semantic_chunking(text, filename)
+            points = []
             
-            # 3. Embedding (Pre-calculate before lock)
-            processed_chunks = []
-            for chunk in raw_chunks:
-                chunk["embedding"] = self.embedder.embed(chunk["text"])
-                processed_chunks.append(chunk)
-                
-            # 4. Storage (Thread-safe)
-            with self.lock:
-                self.chunks.extend(processed_chunks)
-                
-            logger.info(f"Successfully indexed '{filename}' with {len(processed_chunks)} chunks.")
+            for i, chunk in enumerate(chunks):
+                vector = self.embedder.embed(chunk["text"])
+                points.append(PointStruct(
+                    id=f"{filename}_{i}_{os.getpid()}_{np.random.randint(0, 100000)}",
+                    vector=vector.tolist(),
+                    payload={
+                        "text": chunk["text"],
+                        "doc_name": filename,
+                        "chunk_index": chunk["chunk_index"],
+                        "doc_type": doc_type
+                    }
+                ))
+            
+            self.client.upsert(collection_name=self.collection_name, points=points)
+            logger.success(f"Indexed {len(points)} chunks from {filename}")
             return True
-            
         except Exception as e:
-            logger.error(f"Failed to add document {filename}: {e}")
+            logger.error(f"Indexing failure for {filename}: {e}")
             return False
 
-    def query(self, user_input: str) -> Dict:
-        """Complete RAG pipeline execution."""
+    def add_url(self, url: str) -> bool:
+        """Process and index content from a remote URL."""
         try:
-            # Step 1: Query Preprocessing
-            optimized_query = self.generator.rewrite_query(user_input)
+            text = extract_from_url(url)
+            if not text or "Error" in text:
+                return False
+                
+            doc_name = url.split("//")[-1].split("/")[0]
+            chunks = semantic_chunking(text, doc_name)
+            points = []
             
-            # Step 2: Query Embedding
+            for i, chunk in enumerate(chunks):
+                vector = self.embedder.embed(chunk["text"])
+                points.append(PointStruct(
+                    id=f"url_{doc_name}_{i}_{np.random.randint(0, 100000)}",
+                    vector=vector.tolist(),
+                    payload={
+                        "text": chunk["text"],
+                        "doc_name": doc_name,
+                        "chunk_index": chunk["chunk_index"],
+                        "url": url
+                    }
+                ))
+            
+            self.client.upsert(collection_name=self.collection_name, points=points)
+            logger.success(f"Indexed {len(points)} chunks from URL: {url}")
+            return True
+        except Exception as e:
+            logger.error(f"URL Indexing failure for {url}: {e}")
+            return False
+
+    def query(self, user_input: str, top_k: int = 5):
+        """Execute the full RAG cycle: Rewrite -> Retrieve -> Generate."""
+        try:
+            optimized_query = self.generator.rewrite_query(user_input)
             query_vec = self.embedder.embed(optimized_query)
             
-            # Step 3: Hybrid Retrieval
-            with self.lock:
-                # Copy chunks list for search
-                current_chunks = self.chunks[:]
-                
-            retrieved = hybrid_retrieval(
-                query=optimized_query,
-                query_vec=query_vec,
-                chunks=current_chunks,
-                top_k=4,
-                threshold=0.25
+            search_result = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_vec.tolist(),
+                limit=top_k,
+                score_threshold=0.20
             )
             
-            # Step 4: Final Generation
-            # If retrieved is empty, generator handles refusal internally
-            rag_answer = self.generator.generate_answer(user_input, retrieved)
-            
-            # Additional logic: Match score calculation for metadata (UI display)
-            chunk_metadata = []
-            for chunk in retrieved:
-                sim = float(np.dot(query_vec, chunk["embedding"]))
-                chunk_metadata.append({
-                    "doc": chunk["doc_name"],
-                    "idx": chunk["chunk_index"],
-                    "text": chunk["text"],
-                    "score": int(sim * 100)
-                })
+            retrieved = [hit.payload for hit in search_result]
+            chunks_meta = [{
+                "doc": hit.payload.get("doc_name", "unknown"),
+                "idx": hit.payload.get("chunk_index", 0),
+                "text": hit.payload.get("text", ""),
+                "score": int(hit.score * 100)
+            } for hit in search_result]
 
             return {
-                "answer": rag_answer,
-                "chunks": chunk_metadata
+                "answer": self.generator.generate_answer(user_input, retrieved),
+                "chunks": chunks_meta,
+                "optimized_query": optimized_query
             }
-            
         except Exception as e:
-            logger.error(f"RAG Query execution failed: {e}")
-            return {
-                "answer": "A systemic error occurred during retrieval.",
-                "chunks": []
-            }
+            logger.error(f"RAG Retrieval cycle failed: {e}")
+            return {"answer": "Core retrieval failure.", "chunks": []}
 
     def clear(self):
-        """Clear all indexed documents."""
-        with self.lock:
-            self.chunks.clear()
-        logger.info("Document store cleared.")
+        """Wipe the local vector database."""
+        self.client.delete_collection(collection_name=self.collection_name)
+        self._ensure_collection()
+        logger.warning(f"RAGManager: Collection '{self.collection_name}' has been purged.")
+
+    def get_stats(self) -> dict:
+        """Retrieve telemetry data for the collection."""
+        try:
+            info = self.client.get_collection(collection_name=self.collection_name)
+            return {
+                "status": "ready",
+                "chunks": info.points_count,
+                "config": {
+                    "vector_size": settings.VECTOR_SIZE,
+                    "distance": "Cosine"
+                }
+            }
+        except Exception:
+            return {"status": "degraded", "chunks": 0}

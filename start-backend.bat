@@ -23,10 +23,10 @@ if not exist "venv" (
 echo [INFO] Activating virtual environment...
 call venv\Scripts\activate
 
-echo [INFO] Starting RAGchat backend on http://localhost:8000...
+echo [INFO] Starting RAGchat backend on http://localhost:8001...
 echo [INFO] Press Ctrl+C to stop the server
 echo.
 
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 
 pause

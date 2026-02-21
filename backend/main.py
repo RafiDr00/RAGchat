@@ -1,45 +1,55 @@
-import os
-import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+from slowapi.errors import RateLimitExceeded
+from loguru import logger
 
-# Import our new modular core
-from rag_core.api.routes import router as rag_router
+from rag_core.api.routes import router as rag_router, limiter, _rate_limit_exceeded_handler
+from config import settings, setup_logging
+from errors import global_exception_handler
 
-# Configure logging to be precise
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("RAGchat.API")
-
-# Load environment
-load_dotenv()
+# Initialize standardized logging
+setup_logging()
 
 app = FastAPI(
-    title="RAGchat API",
-    description="High-Precision Academic RAG System",
-    version="2.1.0"
+    title=settings.PROJECT_NAME,
+    description="Enterprise-Grade High-Precision RAG Auditor",
+    version=settings.VERSION
 )
+
+# Register Global Exception Handler
+app.add_exception_handler(Exception, global_exception_handler)
+
+# Register Rate Limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include Modular Routes
-app.include_router(rag_router)
+app.include_router(rag_router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("RAGchat Backend is initializing...")
-    if not os.getenv("OPENAI_API_KEY"):
-        logger.error("CRITICAL: OPENAI_API_KEY is missing from environment.")
+    logger.info(f"RAGchat Engine {settings.VERSION} booting up...")
+    if not settings.OPENAI_API_KEY:
+        logger.critical("SYSTEM SHUTDOWN: OPENAI_API_KEY is missing. RAG Core extraction protocol will fail.")
+    
+    logger.success("Core Engine ready. Port: 8001. Rate limiting enabled.")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    # High-concurrency worker strategy for industrial loads
+    uvicorn.run(
+        "main:app", 
+        host="0.0.0.0", 
+        port=8001, 
+        reload=True, # Reload only for local development
+        workers=1     # Set to 4+ in production Docker
+    )
