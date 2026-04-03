@@ -78,3 +78,7 @@ htmlcov/
 *.egg-info/
 dist/
 build/
+backend/.env
+frontend/.env.local
+frontend/.env*.local
+qdrant_db/
